@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <link href='http://fonts.googleapis.com/css?family=Coda' rel='stylesheet' type='text/css'>
+  <link href='http://fonts.googleapis.com/css?family=Share+Tech+Mono' rel='stylesheet' type='text/css'>
+  <style type="text/css">
+    body {
+      width: 960px;
+      margin: auto;
+      margin-top: 15px;
+      background-color: #222;
+      color: #fff;
+      font-family: Coda, sans-serif;
+    }
+
+    a {
+      color: #49c;
+    }
+
+    a:hover {
+      color: #f40;
+    }
+
+    #phosphor {
+      background-color: black;
+      width: 960px;
+      height: 720px;
+    }
+
+    #progEditor {
+      display: block;
+      background-color: black;
+      overflow: scroll;
+      color: white;
+      font-family: "Share Tech Mono", monospace;
+      border: 0px grey solid;
+      width: 320px;
+      height: 320px;
+    }
+
+    .windowdiv {
+      background-color: #27a;
+      border: solid #38b 2px;
+      opacity: 0.66;
+      position: absolute;
+      min-width: 150px;
+    }
+
+    .windowdiv:active {
+      cursor: move;
+    }
+
+    #controlBox {
+      top: 25px;
+      left: 600px;
+      position: fixed;
+    }
+
+    #infoBox {
+      top: 50px;
+      left: 50px;
+    }
+
+    .toggler {
+      float: right;
+      background-color: #38b;
+      cursor: pointer;
+      font-size: 0.85em;
+    }
+
+    .toggler:hover {
+      background-color: #F40;
+    }
+
+    #infoDrawer {
+      background-color: black;
+      width: 500px;
+      position: absolute;
+      top: 35px;
+      left: 40px;
+      opacity: 0.66;
+      padding: 0.5em;
+    }
+
+    #toolDrawer {
+      display: none;
+    }
+
+    #controls {
+      background-color: #38b;
+      font-size: 0.85em;
+    }
+
+    #vps {
+      background-color: #F40;
+      font-family: "Share Tech Mono", monospace;
+    }
+
+    #decay {
+      background-color: #F40;
+      font-family: "Share Tech Mono", monospace;
+    }
+
+    #qref {
+      background-color: #222;
+      font-family: "Share Tech Mono", monospace;
+      font-size: 0.85em;
+      display: none;
+    }
+
+    #galley-left {
+      float: left;
+      width: 600px;
+    }
+
+    #galley-right {
+      float: right;
+      width: 300px;
+    }
+  </style>
+
+  <script>
+    var thisX = 0;
+    var thisY = 0;
+    var lastX = 0;
+    var lastY = 0;
+    var heldItem;
+    var toolBox = document.getElementById('controlBox');
+
+    function mouseMove(evt) {
+      lastX = thisX;
+      lastY = thisY;
+      thisX = evt.clientX;
+      thisY = evt.clientY;
+      if (evt.buttons == 1 && heldItem) {
+        var rect = heldItem.getClientRects()[0];
+        heldItem.style.left = (rect.left + (thisX - lastX)) + "px";
+        heldItem.style.top = (rect.top + (thisY - lastY)) + "px";
+      }
+      if (evt.buttons == 1) {
+        // Make sure the command palette hasn't disappeared, which it sometimes
+        // does when being dragged.
+        tbRects = toolBox.getClientRects()[0];
+        if ((tbRects.right < 0) || (tbRects.left > window.innerWidth) ||
+          (tbRects.bottom < 0) || (tbRects.top > window.innerHeight)) {
+          toolBox.style.left = evt.clientX;
+          toolBox.style.top = evt.clientY;
+        }
+      }
+    }
+    function toggle(el) {
+      target = document.getElementById(el);
+      if (target.style.display) {
+        (target.style.display == "none") ?
+          target.style.display = "block" : target.style.display = "none";
+      } else {
+        target.style.display = "block";
+      }
+    }
+    function dragElement(event) {
+      target = event.target;
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.buttons == 1) {
+        rect = target.getClientRects()[0];
+        target.style.left = (rect.left + (event.clientX - lastX)) + "px";
+        target.style.top = (rect.top + (event.clientY - lastY)) + "px";
+      }
+    }
+    function holdMe(e) {
+      heldItem = e.target;
+    }
+    function dropMe(e) {
+      heldItem = false;
+    }
+    window.addEventListener("mousemove", mouseMove, true);
+    window.addEventListener("mouseup", dropMe, true);
+  </script>
+</head>
+
+<body>
+  <canvas id="phosphor">This page relies on the Canvas element of HTML5.</canvas>
+
+  <!-- ======================================================== -->
+  <div class="windowdiv" id="controlBox" onmousedown="holdMe(event);">
+    <b>Tools</b>
+    <div class="toggler" onclick="toggle('toolDrawer');">[toggle]</div>
+    <div id="toolDrawer">
+      <div id="controls">
+        Vectors Per Second: <span id="vps">200</span> ( Ctrl + [<kbd>&lt;</kbd>] / [<kbd>&gt;</kbd>] to change )<br>
+        Phosphor Decay: <span id="decay">-5%/ms</span> ( Ctrl + [<kbd>[</kbd>] / [<kbd>]</kbd>] to change )
+      </div>
+      <div><b>Program</b> <small>( Ctrl + Enter to assemble & run )</small></div>
+      <textarea id="progEditor" spellcheck="false">
+LABEL START ; This is the beginning of the program
+
+COLOR 7
+LABS -511 0 2 
+VCTR 512 0 1 4
+LABS -511 55 2
+VCTR 512 0 1 4
+LABS -511 125 2
+VCTR 512 0 1 4
+LABS -254 0 0
+VCTR -159 220 1 4
+LABS -127 0 0
+VCTR -63 220 1 4
+LABS 128 0 1
+VCTR 64 220 1 4
+LABS 255 0 1
+VCTR 160 220 1 4
+LABS 0 0 1
+VCTR 0 512 1 4
+
+; Draw some hatches, showing intensity levels
+LABS -127 -450 1
+JSRL VHATCH
+LABS -127 155 1
+JSRL VHATCH
+
+; Draw some asteroids, demonstrating scaling
+LABS -255 -100 4
+JSRL ROID01
+LABS -255 -200 3
+JSRL ROID01
+LABS -255 -270 2
+JSRL ROID01
+JMPL START ; return to the beginning
+
+; The hatch-lines subroutine
+LABEL VHATCH
+SVEC 0 1 0 1
+SVEC 1 -1 0 0
+SVEC 0 1 0 2
+SVEC 1 -1 0 0
+SVEC 0 1 0 3
+SVEC 1 -1 0 0
+SVEC 0 1 0 4
+SVEC 1 -1 0 0
+SVEC 0 1 0 5
+SVEC 1 -1 0 0
+SVEC 0 1 0 6
+SVEC 1 -1 0 0
+SVEC 0 1 0 7
+SVEC 1 -1 0 0
+SVEC 0 1 0 8
+SVEC 1 -1 0 0
+SVEC 0 1 0 9
+SVEC 1 -1 0 0
+SVEC 0 1 0 10
+SVEC 1 -1 0 0
+SVEC 0 1 0 11
+SVEC 1 -1 0 0
+SVEC 0 1 0 12
+SVEC 1 -1 0 0
+SVEC 0 1 0 13
+SVEC 1 -1 0 0
+SVEC 0 1 0 14
+SVEC 1 -1 0 0
+SVEC 0 1 0 15
+RTSL
+
+; The asteroid subroutine
+LABEL ROID01
+VCTR 0 2 1 0
+VCTR 2 2 1 8
+VCTR 2 -2 1 8
+VCTR -1 -2 1 8
+VCTR 1 -2 1 8
+VCTR -3 -2 1 8
+VCTR -3 0 1 8
+VCTR -2 2 1 8
+VCTR 0 4 1 8
+VCTR 2 2 1 8
+VCTR 2 -2 1 8
+RTSL
+	</textarea>
+      <div>
+
+        <script src="dvgsim.js"></script>
+
+        <body>
+
+</html>
