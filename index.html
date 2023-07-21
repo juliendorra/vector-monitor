@@ -196,7 +196,6 @@
       <textarea id="progEditor" spellcheck="false">
 LABEL START ; This is the beginning of the program
 
-COLOR 7
 LABS -511 0 2 
 VCTR 512 0 1 4
 LABS -511 55 2
@@ -204,12 +203,16 @@ VCTR 512 0 1 4
 LABS -511 125 2
 VCTR 512 0 1 4
 LABS -254 0 0
+COLOR 1
 VCTR -159 220 1 4
 LABS -127 0 0
+COLOR 2
 VCTR -63 220 1 4
 LABS 128 0 1
+COLOR 3
 VCTR 64 220 1 4
 LABS 255 0 1
+COLOR 5
 VCTR 160 220 1 4
 LABS 0 0 1
 VCTR 0 512 1 4
@@ -264,18 +267,22 @@ RTSL
 
 ; The asteroid subroutine
 LABEL ROID01
+COLOR 4
 VCTR 0 2 1 0
 VCTR 2 2 1 8
 VCTR 2 -2 1 8
 VCTR -1 -2 1 8
+COLOR 3
 VCTR 1 -2 1 8
 VCTR -3 -2 1 8
 VCTR -3 0 1 8
+COLOR 2
 VCTR -2 2 1 8
 VCTR 0 4 1 8
 VCTR 2 2 1 8
 VCTR 2 -2 1 8
-RTSL
+COLOR 0
+RTSL         
 	</textarea>
       <div>
 

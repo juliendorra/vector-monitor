@@ -19,6 +19,7 @@ var stack = new Array();   // Stack
 var program = new Array(); // Program memory
 var HALT_FLAG = 0;         // 
 var SCALE_FACTOR = 0;      //
+var COLOR = 0;
 var lastIntensity = 8;
 //==============================================
 var intWidths1 = [1, 1, 1, 1, 1, 1, 1, 1,
@@ -37,6 +38,17 @@ var divisors = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512];
 var scalers = [0, 2, 4, 8, 16, 32, 64, 128,
 	0.00390625, 0.0078125, 0.15625, 0.3125,
 	0.0625, 0.125, 0.25, 0.5];
+var colors = [
+	[255, 255, 255],
+
+	[0, 255, 255],
+	[255, 0, 255],
+	[255, 0, 0],
+
+	[255, 0, 0],
+	[0, 255, 0],
+	[0, 0, 255]
+]
 
 // Default (empty) program
 program.push(new vecOp("LABS"));
@@ -45,6 +57,7 @@ program.push(new vecOp("JMPL", 0));
 
 function vecOp(opcode, a1, a2, a3, a4) {
 	// VCTR, LABS, HALT, JSRL, RTSL, JMPL, SVEC
+	// SCALE, CENTER, COLOR
 	this.opcode = opcode || "HALT";
 	if (this.opcode == "VCTR") {
 		this.x = parseInt(a1) || 0;
@@ -60,6 +73,13 @@ function vecOp(opcode, a1, a2, a3, a4) {
 		this.x = parseInt(a1) || 511;
 		this.y = parseInt(a2) || 511;
 		this.scale = parseInt(a3) || 1;
+	} else if (this.opcode == "SCALE") {
+		this.scale = parseInt(a1) || 0;
+	} else if (this.opcode == "CENTER") {
+		this.x = 512;
+		this.y = 512;
+	} else if (this.opcode == "COLOR") {
+		this.color = parseInt(a1) || 0;
 	} else if ((this.opcode == "JSRL") || (this.opcode == "JMPL")) {
 		this.target = parseInt(a1);
 	}
@@ -89,7 +109,34 @@ function mainLoop() {
 	DVG.moveTo(lastPoint.x, lastPoint.y);
 	for (ops = 0; ops < maxOps; ops++) {
 		thisOp = program[pc];
-		if (thisOp.opcode == "LABS") { // [L]oad [ABS]olute
+
+		if (thisOp.opcode == "SCALE") { // [L]oad [ABS]olute
+			SCALE_FACTOR = thisOp.scale;
+		}
+
+		else if (thisOp.opcode == "CENTER") { // Recenter the beam
+			// Deflect the beam to the center
+			// drawing nothing; set the global scale factor.
+			DVG.moveTo(thisOp.x, thisOp.y);
+			// Save our deflection in case we have to resume the
+			// program on another iteration of main_loop();
+			lastPoint.x = thisOp.x;
+			lastPoint.y = thisOp.y;
+		}
+
+		else if (thisOp.opcode == "COLOR") { // [L]oad [ABS]olute
+
+			glowStroke();  // Draw whatever's on the path right now
+
+			COLOR = thisOp.color;
+
+			DVG.beginPath();  // Begin a new path at last
+			// deflection...
+			DVG.moveTo(lastPoint.x, lastPoint.y);
+
+
+		}
+		else if (thisOp.opcode == "LABS") { // [L]oad [ABS]olute
 			// Deflect the beam to a specific coordinate on the
 			// screen, drawing nothing; set the global scale factor.
 			DVG.moveTo(thisOp.x, thisOp.y);
@@ -98,7 +145,9 @@ function mainLoop() {
 			// program on another iteration of main_loop();
 			lastPoint.x = thisOp.x;
 			lastPoint.y = thisOp.y;
-		} else if (thisOp.opcode == "VCTR") {// Draw long [V]e[CT]o[R]
+		}
+
+		else if (thisOp.opcode == "VCTR") {// Draw long [V]e[CT]o[R]
 			// Draw a vector at the specified intensity. Coordinates
 			// are relative to the current deflection, and are divided
 			// by 2^divisor, then multiplied according to the global
@@ -118,7 +167,10 @@ function mainLoop() {
 			lastPoint.x += relX; // Save where our deflection will
 			lastPoint.y += relY; // be at the end of this vector.
 			DVG.lineTo(lastPoint.x, lastPoint.y);
-		} else if (thisOp.opcode == "SVEC") {// [S]hort [VEC]tor
+
+		}
+
+		else if (thisOp.opcode == "SVEC") {// [S]hort [VEC]tor
 			// Similar to VCTR, but with a less-precise way of
 			// specifying length.  
 
@@ -180,14 +232,19 @@ function mainLoop() {
 
 function glowStroke() {
 	// Draw the vector three times, to build-up a glow-like effect.
+
+	let color = colors[COLOR % colors.length].join(",") // rolling over the color array
+
+	// 127,228,255
+
 	DVG.lineWidth = intWidths3[lastIntensity] + (Math.random() * 2);
-	DVG.strokeStyle = "rgba(127,228,255," + intBright3[lastIntensity] + ")";
+	DVG.strokeStyle = "rgba(" + color + "," + intBright3[lastIntensity] + ")";
 	DVG.stroke();
 	DVG.lineWidth = intWidths2[lastIntensity] + Math.random();
-	DVG.strokeStyle = "rgba(127,228,255," + intBright2[lastIntensity] + ")";
+	DVG.strokeStyle = "rgba(" + color + "," + intBright2[lastIntensity] + ")";
 	DVG.stroke();
 	DVG.lineWidth = intWidths1[lastIntensity];
-	DVG.strokeStyle = "rgba(127,228,255," + intBright1[lastIntensity] + ")";
+	DVG.strokeStyle = "rgba(" + color + "," + intBright1[lastIntensity] + ")";
 	DVG.stroke();
 }
 
@@ -213,7 +270,10 @@ function parseProgram() {
 			(splitLine[0] == "JSRL") ||
 			(splitLine[0] == "RTSL") ||
 			(splitLine[0] == "JMPL") ||
-			(splitLine[0] == "SVEC")) {
+			(splitLine[0] == "SVEC") ||
+			(splitLine[0] == "SCALE") ||
+			(splitLine[0] == "COLOR") ||
+			(splitLine[0] == "CENTER")) {
 			opNum++;
 		}
 	}
@@ -246,7 +306,15 @@ function parseProgram() {
 				splitLine[2],
 				splitLine[3],
 				splitLine[4]);
-		} else {
+		}
+		else if (splitLine[0] == "COLOR") {
+			var newOp = new vecOp("COLOR",
+				splitLine[1]);
+		}
+		else if (splitLine[0] == "CENTER") {
+			var newOp = new vecOp("CENTER");
+		}
+		else {
 			// If there's no opcode at the start of the line, treat it like a 
 			// comment and ignore it.
 			continue;
