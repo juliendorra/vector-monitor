@@ -1,7 +1,7 @@
 var canvasElement = document.getElementById("phosphor");
 var DVG = canvasElement.getContext("2d");
-canvasElement.width = 960; //window.innerWidth;
-canvasElement.height = 720; //window.innerHeight;
+canvasElement.width = window.innerWidth;
+canvasElement.height = window.innerHeight;
 tailsX = Array(0, 0, 0);
 tailsY = Array(0, 0, 0);
 bufferWidth = canvasElement.width * 4;
