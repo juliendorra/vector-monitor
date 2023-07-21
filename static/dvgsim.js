@@ -7,7 +7,7 @@ tailsY = Array(0, 0, 0);
 bufferWidth = canvasElement.width * 4;
 bufferDepth = bufferWidth * canvasElement.height;
 maxOps = 40;
-pDecay = 0.25;
+pDecay = 0.07;
 lastPoint = new Object();
 lastPoint.x = 0;
 lastPoint.y = 0;
@@ -88,7 +88,7 @@ function vecOp(opcode, a1, a2, a3, a4) {
 function mainLoop() {
 
 	// phosphor fade-out
-	DVG.globalCompositeOperation = "source-over";
+	// DVG.globalCompositeOperation = "source-over";
 	DVG.fillStyle = "rgba(0,0,0," + pDecay + ")";
 	DVG.fillRect(0, 0, canvasElement.width, canvasElement.height);
 
@@ -97,7 +97,7 @@ function mainLoop() {
 	// Prepare the context for drawing
 	DVG.lineJoin = "round";
 	DVG.lineCap = "round";
-	DVG.globalCompositeOperation = "lighter";
+	// DVG.globalCompositeOperation = "lighter";
 
 	// Now we'll start to run the program, but only perform the number
 	// of operations in maxOps.
