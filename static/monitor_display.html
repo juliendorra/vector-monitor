@@ -278,6 +278,18 @@ RTSL`  ;
     window.addEventListener("mouseup", dropMe, true);
     window.addEventListener("load", setCodeExample, true);
   </script>
+  <script>
+    window.addEventListener("load", () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      window.monitorId = urlParams.get('id');
+      if (window.monitorId) {
+        console.log("Monitor ID:", window.monitorId);
+      } else {
+        console.error("Monitor ID not found in URL query parameters. Please append ?id=<your_monitor_id>");
+        // Optionally, display an error to the user on the page
+      }
+    });
+  </script>
 </head>
 
 <body>
@@ -294,9 +306,10 @@ RTSL`  ;
       <div><b>Program</b> <small>( Ctrl + Enter to assemble & run )</small></div>
       <textarea id="progEditor" spellcheck="false"></textarea>
       <div>
-
+        <!-- dvgsim.js is loaded here, after window.monitorId should be set -->
         <script src="dvgsim.js"></script>
-
-        <body>
+    </div>
+  </div>
+</body>
 
 </html>

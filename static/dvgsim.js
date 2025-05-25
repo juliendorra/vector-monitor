@@ -1,5 +1,91 @@
 var canvasElement = document.getElementById("phosphor");
 var DVG = canvasElement.getContext("2d");
+
+// WebSocket connection setup
+if (window.monitorId) {
+  const socketURL = `ws://${window.location.host}/ws/${window.monitorId}`;
+  const socket = new WebSocket(socketURL);
+
+  socket.onopen = () => {
+    console.log(`WebSocket connected for monitor: ${window.monitorId}`);
+  };
+
+  socket.onclose = () => {
+    console.log(`WebSocket disconnected for monitor: ${window.monitorId}`);
+  };
+
+  socket.onerror = (error) => {
+    console.error(`WebSocket error for monitor ${window.monitorId}:`, error);
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const newOpsData = JSON.parse(event.data);
+      console.log("Received new program via WebSocket:", newOpsData);
+
+      program.length = 0; // Clear the existing program
+
+      for (const opData of newOpsData) {
+        // Note: The vecOp constructor in the original script uses arguments a1, a2, a3, a4
+        // We need to map properties from opData to these arguments based on opcode.
+        // This is a simplified mapping; a more robust solution would handle all opcodes and their specific params.
+        let newOp;
+        switch (opData.opcode) {
+          case "VCTR":
+            newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.divisor, opData.intensity);
+            break;
+          case "LABS":
+            newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale);
+            break;
+          case "SVEC":
+            newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale, opData.intensity);
+            break;
+          case "JMPL":
+          case "JSRL":
+            newOp = new vecOp(opData.opcode, opData.target);
+            break;
+          case "COLOR":
+            newOp = new vecOp(opData.opcode, opData.color);
+            break;
+          case "SCALE":
+            newOp = new vecOp(opData.opcode, opData.scale);
+            break;
+          case "HALT":
+          case "RTSL":
+          case "CENTER":
+            newOp = new vecOp(opData.opcode);
+            break;
+          default:
+            console.warn("Unknown opcode in WebSocket message:", opData.opcode);
+            continue; // Skip unknown opcodes
+        }
+        if (newOp) {
+          program.push(newOp);
+        }
+      }
+
+      // Reset simulation state
+      pc = 0;
+      HALT_FLAG = 0;
+      // Reset beam position to center, adjusted for DVG coordinate system if necessary
+      // The original LABS instruction adds 512 to x and y when parsing.
+      // Here, we set to canvas center directly for simplicity.
+      lastPoint.x = canvasElement.width / 2;
+      lastPoint.y = canvasElement.height / 2;
+      DVG.moveTo(lastPoint.x, lastPoint.y);
+      DVG.beginPath(); // Clear any previous path
+
+      console.log("Program updated from WebSocket. New program length:", program.length);
+      // mainLoop is already running via setInterval, resetting HALT_FLAG = 0 will make it pick up the new program.
+
+    } catch (e) {
+      console.error("Error processing WebSocket message:", e);
+    }
+  };
+} else {
+  console.warn("window.monitorId not set. WebSocket connection for real-time updates will not be established.");
+}
+
 canvasElement.width = window.innerWidth;
 canvasElement.height = window.innerHeight;
 tailsX = Array(0, 0, 0);
