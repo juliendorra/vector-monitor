@@ -52,12 +52,54 @@ JMPL START ; Loop back to the beginning
             `.trim()
         },
         {
+            name: "Five looping Squares",
+            code: `
+LABEL START
+COLOR 5 
+
+LABS -350 -250 1
+VCTR 100 0 1 15
+VCTR 0 100 1 15
+VCTR -100 0 1 15
+VCTR 0 -100 1 15
+
+LABS 350 -250 1
+VCTR 100 0 1 15
+VCTR 0 100 1 15
+VCTR -100 0 1 15
+VCTR 0 -100 1 15
+
+LABS 350 250 1
+VCTR 100 0 1 15
+VCTR 0 100 1 15
+VCTR -100 0 1 15
+VCTR 0 -100 1 15
+
+LABS -350 250 1
+VCTR 100 0 1 15
+VCTR 0 100 1 15
+VCTR -100 0 1 15
+VCTR 0 -100 1 15
+
+LABS 0 0 1
+VCTR 100 0 1 15
+VCTR 0 100 1 15
+VCTR -100 0 1 15
+VCTR 0 -100 1 15
+
+JMPL START ; Loop back to the beginning
+            `.trim()
+        },
+        {
             name: "Simple Line Test",
             code: `
+; This will only display a transient line
+; you would need to send this repeatedly, 
+; altering the value in your program
 COLOR 1 ; Cyan
 LABS 100 100 1
 VCTR 200 50 1 8
-HALT
+HALT ; halt is needed to tell the DVG to render
             `.trim()
         },
         {
@@ -67,7 +109,7 @@ LABEL MAIN
 JSRL DRAWSMALLBOX
 LABS 200 200 1 ; Move a bit
 JSRL DRAWSMALLBOX
-HALT
+JMPL MAIN
 
 LABEL DRAWSMALLBOX
 COLOR 2 ; Magenta
