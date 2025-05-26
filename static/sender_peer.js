@@ -106,6 +106,9 @@ HALT ; halt is needed to tell the DVG to render
             name: "Subroutine Example (Two Boxes)",
             code: `
 LABEL MAIN
+; if you remove this initial positioning,
+; on looping back here, position would be 200 200
+LABS 0 0 1 
 JSRL DRAWSMALLBOX
 LABS 200 200 1 ; Move a bit
 JSRL DRAWSMALLBOX
