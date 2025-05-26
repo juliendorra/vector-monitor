@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PeerJS DVG Command Sender</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nanoid/3.3.4/nanoid.min.js"></script> <!-- NanoID Library -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script> 
     <style>
         body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
         .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
@@ -40,7 +45,8 @@
 
         <div>
             <label for="targetPeerId">Target Monitor Peer ID:</label>
-            <input type="text" id="targetPeerId" placeholder="Enter monitor's PeerJS ID">
+            <input type="text" id="targetPeerId" placeholder="Enter monitor's PeerJS ID" style="width: calc(95% - 130px);"> <!-- Adjusted width -->
+            <button type="button" id="createNewMonitorButton" style="margin-left: 5px; padding: 10px 12px; vertical-align: middle;">Generate ID</button> 
         </div>
 
         <div>
@@ -49,11 +55,20 @@
         </div>
 
         <div>
-            <label for="dvgCommandsJson">DVG Assembly Program Text:</label>
-            <textarea id="dvgCommandsJson" spellcheck="false"></textarea>
+            <label for="dvgExamples">Load Example Program:</label>
+            <select id="dvgExamples" style="margin-bottom: 10px; padding: 8px; border-radius: 4px;">
+                <option value="">-- Select an Example --</option>
+                <!-- Options will be populated by JavaScript -->
+            </select>
+        </div>
+
+        <div>
+            <label for="dvgCommandsEditor">DVG Assembly Program Text:</label> 
+            <textarea id="dvgCommandsEditor"></textarea> 
         </div>
 
         <button id="connectAndSendButton">Connect & Send Commands</button>
+        <button type="button" id="openMonitorButton" style="margin-left: 10px; padding: 10px 15px;">Open Monitor</button> 
 
         <div id="senderStatus">Status: Idle</div>
     </div>
