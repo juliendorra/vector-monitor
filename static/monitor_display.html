@@ -278,16 +278,17 @@ RTSL`  ;
     window.addEventListener("mouseup", dropMe, true);
     window.addEventListener("load", setCodeExample, true);
   </script>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
     window.addEventListener("load", () => {
       const urlParams = new URLSearchParams(window.location.search);
-      window.monitorId = urlParams.get('id');
-      if (window.monitorId) {
-        console.log("Monitor ID:", window.monitorId);
+      window.monitorPeerIdToUse = urlParams.get('peerId'); // Changed to peerId
+      if (window.monitorPeerIdToUse) {
+        console.log("Requested PeerJS ID from URL:", window.monitorPeerIdToUse);
       } else {
-        console.error("Monitor ID not found in URL query parameters. Please append ?id=<your_monitor_id>");
-        // Optionally, display an error to the user on the page
+        console.log("No PeerJS ID in URL, will use default or let PeerJS generate one.");
       }
+      // The 'id' for monitorId (WebSocket) is no longer used here.
     });
   </script>
 </head>
@@ -297,6 +298,7 @@ RTSL`  ;
 
   <!-- ======================================================== -->
   <div class="windowdiv" id="controlBox" onmousedown="holdMe(event);">
+    <div id="monitorPeerIdDisplay">PeerJS ID: Not connected yet</div> <!-- Added PeerJS ID display -->
     <div class="toggler" id="toolToggler" onclick="toggle('toolDrawer', 'toolToggler', {opened:'Close Tools', closed:'Open Tools'} );">Open Tools</div>
     <div id="toolDrawer">
       <div id="controls">

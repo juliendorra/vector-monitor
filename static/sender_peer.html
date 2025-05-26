@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeerJS DVG Command Sender</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        .container { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], textarea {
+            width: 95%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea { min-height: 150px; font-family: monospace; }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background-color: #0056b3; }
+        #senderStatus { margin-top: 15px; padding: 10px; border: 1px solid #eee; border-radius: 4px; background-color: #e9ecef; }
+        #myPeerIdDisplay { margin-bottom: 15px; padding: 10px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>PeerJS DVG Command Sender</h1>
+
+        <div id="myPeerIdDisplay">My PeerJS ID: Initializing...</div>
+
+        <div>
+            <label for="targetPeerId">Target Monitor Peer ID:</label>
+            <input type="text" id="targetPeerId" placeholder="Enter monitor's PeerJS ID">
+        </div>
+
+        <div>
+            <label for="dvgCommandsJson">DVG Commands (JSON Array of Ops):</label>
+            <textarea id="dvgCommandsJson" spellcheck="false"></textarea>
+        </div>
+
+        <button id="connectAndSendButton">Connect & Send Commands</button>
+
+        <div id="senderStatus">Status: Idle</div>
+    </div>
+
+    <script src="sender_peer.js"></script>
+</body>
+</html>
