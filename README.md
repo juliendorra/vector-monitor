@@ -1,7 +1,12 @@
 # Web DVG CRT Vector Monitor
 
 This project implements a web-based "fantasy" CRT vector monitor that receives drawing commands in real-time using PeerJS for peer-to-peer communication. It simulates the visual characteristics of a vector display, allowing other web applications to use it as an output peripheral.
+
+The commands are based on the ones in the Atari's Digital Vector Generator, used in Asteroids and Tempest. 
+
 It's important to understand that this monitor emulates a *programmable display*. Rather than just rendering static images, applications send a sequence of commands—a program—that the monitor's vector generator interprets. This program can include control flow instructions like jumps and subroutine calls, enabling dynamic and persistent visuals.
+
+It's based on the [Atari Digital Vector Generator Simulator](https://laemeur.sdf.org/dvgsim/) by Adam Moore, with COLOR, CENTER and SCALE commands added.
 
 ## Architecture
 
@@ -17,7 +22,7 @@ The server component (`main.ts`) is a simple Deno static file server responsible
 *   Real-time vector drawing on an HTML canvas.
 *   PeerJS integration for P2P communication.
 *   Configurable PeerJS ID for the monitor via URL parameters.
-*   Example sender application that supports raw DVG assembly and JSON input.
+*   Example sender application that supports raw DVG assembly 
 *   Displays received DVG program code in a text area on the monitor page.
 *   Simulated phosphor glow and decay effects.
 *   Support for programmatic DVG commands including loops and subroutines for persistent/dynamic displays.
