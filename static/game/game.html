@@ -1,34 +1,137 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vector Arcade Game</title>
     <style>
-        body {
-            margin: 0;
-            background-color: #111;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-
-        iframe {
-            border: none;
-            width: 80vw;
-            height: 80vh;
-        }
+        body { margin: 0; background-color: #111; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        iframe { border: none; width: 80vw; height: 80vh; }
     </style>
 </head>
-
 <body>
     <iframe id="monitorFrame" src=""></iframe>
 
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script type="module" src="/game/peer-setup.js"></script>
-</body>
+    <script type="module" src="input.js"></script>
+    <script type="module" src="vector.js"></script>
+    <script type="module" src="game.js"></script>
+    <script type="module" src="levels.js"></script>
+    <script type="module" src="main.js"></script>
+    <script type="module">
+        import { initializeInput, isLeftArrowDown, isRightArrowDown, isSpaceBarDown } from './input.js';
+        import { startGame } from './main.js';
+        // Existing code:
+        // const monitorPeerId = 'vectorGameMonitorInstance1';
+        // document.addEventListener('DOMContentLoaded', () => { ... });
 
+        // New PeerJS communication logic:
+        let peer = null;
+        let gameConnection = null;
+        const monitorPeerId = 'vectorGameMonitorInstance1'; // Ensure this matches the iframe src
+        const gamePeerId = 'vectorGameSenderInstance1'; // Unique ID for the game page
+
+        function initializeGamePeer() {
+            peer = new Peer(gamePeerId, { debug: 2 });
+
+            peer.on('open', (id) => {
+                console.log('Game PeerJS ID:', id);
+                // Attempt to connect to the monitor
+                connectToMonitor();
+            });
+
+            peer.on('error', (err) => {
+                console.error('Game PeerJS error:', err);
+                // Potentially retry connection or inform the user
+            });
+
+            peer.on('disconnected', () => {
+                console.log('Game PeerJS disconnected. Attempting to reconnect...');
+                if (peer && !peer.destroyed) {
+                    peer.reconnect();
+                }
+            });
+
+            peer.on('close', () => {
+                console.log('Game PeerJS connection closed.');
+                // Potentially try to re-initialize
+            });
+        }
+
+        function connectToMonitor() {
+            if (!peer) {
+                console.error('Peer object not initialized.');
+                return;
+            }
+            if (gameConnection && gameConnection.open) {
+                console.log('Already connected to monitor.');
+                return;
+            }
+
+            console.log(`Attempting to connect to monitor with PeerJS ID: ${monitorPeerId}`);
+            gameConnection = peer.connect(monitorPeerId, { reliable: true });
+
+            gameConnection.on('open', () => {
+                console.log(`Successfully connected to monitor: ${monitorPeerId}`);
+                gameConnection.send('Hello from game page! Connection established.');
+                // --- REPLACE THE OLD sendDVGCommands TEST CALL ---
+                // sendDVGCommands("LABEL START\nCOLOR 1\nVCTR 100 0 1 15\nVCTR 0 100 1 15\nVCTR -100 0 1 15\nVCTR 0 -100 1 15\nJMPL START", 1000);
+                // +++ WITH THIS +++
+                startGame(); // Start the game loop once connected
+            });
+
+            gameConnection.on('data', (data) => {
+                console.log('Received data from monitor:', data);
+                // Handle any messages from the monitor if needed
+            });
+
+            gameConnection.on('error', (err) => {
+                console.error('Game connection to monitor error:', err);
+            });
+
+            gameConnection.on('close', () => {
+                console.log('Connection to monitor closed.');
+                gameConnection = null;
+                // Optionally, try to reconnect
+                // setTimeout(connectToMonitor, 5000); // Example: retry after 5 seconds
+            });
+        }
+
+        // Function to send DVG commands to the monitor
+        // vps (vectors per second) is an optional parameter for metadata
+        function sendDVGCommands(dvgString, vps = 2000) {
+            if (gameConnection && gameConnection.open) {
+                const payload = {
+                    dvgProgramText: dvgString,
+                    metadata: {
+                        vps: vps
+                    }
+                };
+                gameConnection.send(payload);
+                // console.log('Sent DVG commands:', payload);
+            } else {
+                console.warn('Cannot send DVG commands: Not connected to monitor.');
+                // Optionally, try to reconnect or queue commands
+                // connectToMonitor(); // Attempt to reconnect if not connected
+            }
+        }
+        window.sendDVGCommandsFromGameHTML = sendDVGCommands;
+
+        // Initialize PeerJS when the DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            const monitorFrame = document.getElementById('monitorFrame');
+            const monitorSrc = `../monitor_display.html?peerId=${monitorPeerId}`;
+            monitorFrame.src = monitorSrc;
+            console.log(`Set monitor iframe src to: ${monitorSrc}`);
+
+            // Initialize the game's PeerJS connection
+            initializeGamePeer();
+            initializeInput(); // Add this line
+        });
+
+        // Example usage (can be removed or adapted later):
+    </script>
+    <!-- Game modules will be added later:
+    -->
+</body>
 </html>
