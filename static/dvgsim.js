@@ -1,17 +1,22 @@
 var canvasElement = document.getElementById("phosphor");
 var DVG = canvasElement.getContext("2d");
 
-canvasElement.width = window.innerWidth;
-canvasElement.height = window.innerHeight;
-tailsX = Array(0, 0, 0);
-tailsY = Array(0, 0, 0);
+const PHYSICAL_WIDTH = 2048;
+const PHYSICAL_HEIGHT = 2048;
+const LOGICAL_WIDTH = 1024;
+const LOGICAL_HEIGHT = 1024;
+const VIEW_SCALE_X = PHYSICAL_WIDTH / LOGICAL_WIDTH;
+const VIEW_SCALE_Y = PHYSICAL_HEIGHT / LOGICAL_HEIGHT;
+
+// canvasElement.width = window.innerWidth; // This line is removed, size set on load.
+
 bufferWidth = canvasElement.width * 4;
 bufferDepth = bufferWidth * canvasElement.height;
 var maxOps = 40; // Ensure maxOps is globally defined
 var pDecay = 0.07;
 lastPoint = new Object();
-lastPoint.x = 0;
-lastPoint.y = 0;
+lastPoint.x = LOGICAL_WIDTH / 2;
+lastPoint.y = LOGICAL_HEIGHT / 2;
 var vps = document.getElementById("vps"); // Ensure vps span is globally accessible if updated in conn.on('data')
 var decay = document.getElementById("decay");
 
@@ -51,7 +56,7 @@ function vecOp(opcode, a1, a2, a3, a4) {
 	} else if (this.opcode == "SCALE") {
 		this.scale = parseInt(a1) || 0;
 	} else if (this.opcode == "CENTER") {
-		this.x = canvasElement.width / 2; this.y = canvasElement.height / 2;
+		this.x = LOGICAL_WIDTH / 2; this.y = LOGICAL_HEIGHT / 2;
 	} else if (this.opcode == "COLOR") {
 		this.color = parseInt(a1) || 0;
 	} else if ((this.opcode == "JSRL") || (this.opcode == "JMPL")) { this.target = parseInt(a1); }
@@ -128,11 +133,11 @@ function setupConnectionHandler() {
 			HALT_FLAG = 0;
 			lastIntensity = 8;
 			if (canvasElement) {
-				lastPoint.x = canvasElement.width / 2;
-				lastPoint.y = canvasElement.height / 2;
+				lastPoint.x = LOGICAL_WIDTH / 2;
+				lastPoint.y = LOGICAL_HEIGHT / 2;
 				if (DVG) {
-					DVG.moveTo(lastPoint.x, lastPoint.y);
-					DVG.beginPath();
+					// DVG.moveTo(lastPoint.x, lastPoint.y); // Removed: mainLoop handles initial moveTo in scaled context
+					DVG.beginPath(); // Reset path state
 				}
 			}
 			console.log("Program updated and simulation reset. New program length:", program ? program.length : 0);
@@ -145,11 +150,14 @@ function setupConnectionHandler() {
 function mainLoop() {
 	DVG.globalCompositeOperation = "source-over";
 	DVG.fillStyle = "rgba(0,0,0," + pDecay + ")";
-	DVG.fillRect(0, 0, canvasElement.width, canvasElement.height);
+	DVG.fillRect(0, 0, canvasElement.width, canvasElement.height); // Clears physical canvas
 	if (HALT_FLAG == 1) return;
 
+	DVG.save();
+	DVG.scale(VIEW_SCALE_X, VIEW_SCALE_Y);
+
 	DVG.lineJoin = "round"; DVG.lineCap = "round";
-	DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y);
+	DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y); // lastPoint is in logical coordinates
 
 	for (let opsCount = 0; opsCount < maxOps; opsCount++) { // Renamed loop var to avoid conflict
 		if (pc >= program.length || pc < 0) { HALT_FLAG = 1; break; }
@@ -197,14 +205,7 @@ function mainLoop() {
 		if (pc >= program.length) { HALT_FLAG = 1; return; }
 	}
 	glowStroke();
-
-	DVG.lineWidth = 5; DVG.strokeStyle = "rgba(128,0,128,0.5)";
-	DVG.beginPath();
-	if (tailsX.length > 1) {
-		DVG.moveTo(tailsX, tailsY);
-		while (tailsX.length > 1) { tailsX.pop(); tailsY.pop(); DVG.lineTo(tailsX, tailsY); }
-	}
-	glowStroke();
+	DVG.restore();
 }
 
 function glowStroke() {
@@ -251,7 +252,7 @@ function parseProgram() {
 
 		switch (command) {
 			case "VCTR": newOp = new vecOp("VCTR", splitLine[1], splitLine[2], splitLine[3], splitLine[4]); break;
-			case "LABS": newOp = new vecOp("LABS", (canvasElement.width / 2) + parseInt(splitLine[1]), (canvasElement.height / 2) + parseInt(splitLine[2]), splitLine[3]); break;
+			case "LABS": newOp = new vecOp("LABS", (LOGICAL_WIDTH / 2) + parseInt(splitLine[1]), (LOGICAL_HEIGHT / 2) + parseInt(splitLine[2]), splitLine[3]); break;
 			case "HALT": newOp = new vecOp("HALT"); break;
 			case "JSRL":
 				if (codeLabels.hasOwnProperty(splitLine[1])) newOp = new vecOp("JSRL", codeLabels[splitLine[1]]);
@@ -282,7 +283,6 @@ function parseProgram() {
 	// The received text remains, which is fine as it's what parseProgram just parsed.
 }
 
-function mouseHandle(evt) { tailsX.push(evt.clientX); tailsY.push(evt.clientY); }
 function keyHandle(evt) {
 	if (evt.ctrlKey) {
 		if (evt.which == 80) { evt.preventDefault(); HALT_FLAG = HALT_FLAG == 0 ? 1 : 0; }
@@ -294,11 +294,10 @@ function keyHandle(evt) {
 	}
 }
 
-window.addEventListener("mousemove", mouseHandle, true);
 window.addEventListener("keydown", keyHandle, true);
 window.addEventListener("load", () => {
 	if (!canvasElement) { canvasElement = document.getElementById("phosphor"); DVG = canvasElement.getContext("2d"); }
-	if (canvasElement) { canvasElement.width = window.innerWidth; canvasElement.height = window.innerHeight; }
+	if (canvasElement) { canvasElement.width = PHYSICAL_WIDTH; canvasElement.height = PHYSICAL_HEIGHT; }
 	vps = document.getElementById("vps"); // Ensure vps is assigned after DOM load
 	decay = document.getElementById("decay"); // Ensure decay is assigned after DOM load
 	parseProgram();
