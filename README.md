@@ -1,5 +1,7 @@
 # Web DVG CRT Vector Monitor
 
+Try it here: https://vector-monitor.deno.dev/sender_peer.html 
+
 This project implements a web-based "fantasy" CRT vector monitor that receives drawing commands in real-time using PeerJS for peer-to-peer communication. It simulates the visual characteristics of a vector display, allowing other web applications to use it as an output peripheral.
 
 The commands are based on the ones in the Atari's Digital Vector Generator, used in Asteroids and Tempest. 
@@ -12,8 +14,8 @@ It's based on the [Atari Digital Vector Generator Simulator](https://laemeur.sdf
 
 The system consists of two main parts:
 
-1.  **The DVG Monitor (`static/monitor_display.html`):** This is the client-side application that emulates the vector display. It initializes a PeerJS client, obtains a unique PeerJS ID, and listens for incoming data connections. When it receives DVG (Digital Vector Generator) commands (a program), it renders them on an HTML canvas.
-2.  **The Sender Application (example: `static/sender_peer.html`):** This is an example web application that also uses PeerJS. It connects to a specified DVG Monitor's PeerJS ID and sends DVG command programs to it. This sender can accept commands as raw DVG assembly text (which it parses) or as a pre-formatted JSON array of operations.
+1.  **The DVG Monitor (`static/monitor_display.html`):** This is the client-side application that emulates the vector display. It initializes a PeerJS client, obtains a unique PeerJS ID (typically provided via URL parameter), and listens for incoming data connections. When it receives DVG (Digital Vector Generator) commands (a program), it renders them on an HTML canvas.
+2.  **The Sender Application (example: `static/sender_peer.html`):** This is an example web application that also uses PeerJS. It allows users to write or load DVG assembly programs, connect to a specified DVG Monitor's PeerJS ID, and send the programs for execution. It includes features like PeerJS ID generation for monitors, local storage for target IDs, a CodeMirror editor with DVG syntax highlighting, and example scripts.
 
 The server component (`main.ts`) is a simple Deno static file server responsible only for serving the HTML, JavaScript, and CSS files. All real-time communication is handled directly between the sender and the monitor clients via PeerJS, using the public PeerJS server for signaling by default.
 
@@ -21,9 +23,16 @@ The server component (`main.ts`) is a simple Deno static file server responsible
 
 *   Real-time vector drawing on an HTML canvas.
 *   PeerJS integration for P2P communication.
-*   Configurable PeerJS ID for the monitor via URL parameters.
-*   Example sender application that supports raw DVG assembly 
-*   Displays received DVG program code in a text area on the monitor page.
+*   Sender UI with:
+    *   NanoID generation for unique monitor PeerJS IDs.
+    *   Button to directly open a configured monitor window.
+    *   Local browser storage for remembering the last used Target Monitor Peer ID.
+    *   CodeMirror editor for DVG assembly input with custom syntax highlighting.
+    *   Cmd/Ctrl+Enter shortcut to send programs from the editor.
+    *   A selector for loading example DVG scripts.
+    *   Option to suggest a "Desired Display VPS" (Vectors Per Second) to the monitor.
+*   Monitor displays received DVG program code in its own UI.
+*   Monitor dynamically adjusts drawing speed (`maxOps`) based on program length and received VPS metadata to improve CRT effect for varying program sizes.
 *   Simulated phosphor glow and decay effects.
 *   Support for programmatic DVG commands including loops and subroutines for persistent/dynamic displays.
 
@@ -44,40 +53,48 @@ The server component (`main.ts`) is a simple Deno static file server responsible
    ```
    This will start a local web server, typically at `http://localhost:8000`.
 
-**B. Open the DVG Monitor Page:**
+**B. Launching the Monitor via the Sender Page:**
 
-   In your web browser, navigate to the monitor page. You have a few options for the PeerJS ID:
+   The recommended way to start is by using the Sender Page to generate a unique ID for your monitor instance and then launch it.
 
-   *   **Use a specific ID:**
-       `http://localhost:8000/monitor_display.html?peerId=your-chosen-monitor-id`
-       (Replace `your-chosen-monitor-id` with a unique string).
-   *   **Use the default test ID:**
-       `http://localhost:8000/monitor_display.html?peerId=peerjs-nqijkptdzzrf-vector`
-   *   **Let PeerJS assign a random ID:**
-       `http://localhost:8000/monitor_display.html`
+   1.  **Open the Sender Page:**
+       In your web browser, navigate to:
+       ```
+       http://localhost:8000/sender_peer.html
+       ```
+       The Sender Page will initialize its own PeerJS connection and display its ID. It also provides controls to manage the target monitor. If you've used it before, it might remember your last Target Monitor Peer ID.
 
-   The monitor page will display its *actual* PeerJS ID (e.g., "Monitor PeerJS ID: your-chosen-monitor-id"). Note this ID down, as the sender will need it.
+   2.  **Generate a Monitor ID (if needed):**
+       *   On the Sender Page, click the "Generate ID" button next to the "Target Monitor Peer ID" field.
+       *   This will populate the field with a new, unique ID (e.g., `your-generated-id`).
+       *   The full URL for this new monitor (e.g., `http://localhost:8000/monitor_display.html?peerId=your-generated-id`) will also be logged to your browser's developer console. This ID is automatically saved locally in your browser for future sessions.
 
-**C. Open the Sender Page:**
+   3.  **Open the Monitor Window:**
+       *   Ensure the "Target Monitor Peer ID" field on the Sender Page contains the ID you want to use.
+       *   Click the "Open Monitor" button on the Sender Page.
+       *   This will open the DVG Monitor (`monitor_display.html`) in a new browser tab or window, configured with the PeerJS ID from the input field.
 
-   In another browser tab or window, navigate to:
-   ```
-   http://localhost:8000/sender_peer.html
-   ```
-   This page will also initialize its own PeerJS client and display its ID. The sender's command input area can accept DVG programs in raw assembly text format or as a JSON array of operations.
+   4.  **Verify Monitor Connection:**
+       *   Switch to the newly opened DVG Monitor window.
+       *   It should display "Monitor PeerJS ID: your-generated-id" (or whatever ID was generated/used). This confirms it's ready.
+   
+   You now have the Sender Page and the DVG Monitor Page open. The "Target Monitor Peer ID" on the sender page is set to the ID of the monitor window you just opened.
+
+   *(Alternatively, you can still manually open `monitor_display.html` with a specific `?peerId=` or let it generate a random one, and then copy that ID into the sender's target field, but the above workflow is generally more convenient.)*
 
 ### 3. Testing with the Sender UI
 
-1.  On the **Sender Page (`sender_peer.html`):**
-    *   In the "Target Monitor Peer ID" field, enter the full PeerJS ID that the DVG Monitor page is displaying.
-    *   The "DVG Commands (Raw Assembly or JSON Array):" textarea will be pre-filled with an example DVG assembly program that draws a looping square. You can modify this or use your own DVG assembly or JSON. (See "DVG Command Reference" below).
-    *   Click the "Connect & Send Commands" button.
+1.  **Using the Sender Page (`sender_peer.html`):**
+    *   Ensure the "Target Monitor Peer ID" field is populated with the ID of the DVG Monitor window you opened (this should be automatic if you used the "Generate ID" and "Open Monitor" buttons).
+    *   The "DVG Assembly Program Text:" CodeMirror editor area will be pre-filled with an example DVG assembly program (a looping square). You can select other examples from the "Load Example Program:" dropdown, or write/paste your own DVG assembly. (See "DVG Command Reference" below).
+    *   (Optional) You can specify a "Desired Display VPS" to influence the monitor's drawing speed.
+    *   Click the "Connect & Send Commands" button (or use Cmd/Ctrl+Enter shortcut from the editor).
 
-2.  On the **DVG Monitor Page (`monitor_display.html`):**
-    *   If the connection is successful, the DVG program sent from the sender page should be executed and rendered on the canvas. If it's a looping program, the image will persist.
-    *   The text area under "Open Tools" > "Program" should display the received commands in an assembly-like format.
+2.  **On the DVG Monitor Page (`monitor_display.html`):**
+    *   If the connection is successful, the DVG program sent from the sender page should be executed and rendered on the canvas. If it's a looping program, the image will persist with CRT effects.
+    *   The text area under "Open Tools" > "Program" should display the received DVG assembly text as it was sent.
 
-    Check the browser's Developer Console on both pages for status messages or errors.
+    Check the browser's Developer Console on both pages for status messages or errors (e.g., the monitor page logs the "Adjusted maxOps" value).
 
 ## Integrating into Your Own Application
 
@@ -94,128 +111,65 @@ To send DVG commands from your own web application to the DVG Monitor:
     peer.on('open', function(id) {
         console.log('My application PeerJS ID is: ' + id);
     });
-    peer.on('error', function(err) {
-        console.error('PeerJS error in application:', err);
-    });
+    // ... error handling ...
     ```
 
-3.  **Connect to the DVG Monitor:**
+3.  **Connect to the DVG Monitor & Send Program:**
     ```javascript
-    // targetMonitorPeerId is the ID displayed by the DVG Monitor page
-    const targetMonitorPeerId = '...'; // Get this from the monitor instance
+    const targetMonitorPeerId = '...'; // The ID of the target DVG Monitor instance
     const conn = peer.connect(targetMonitorPeerId, { reliable: true });
 
     conn.on('open', () => {
-        console.log('Connected to DVG Monitor: ' + targetMonitorPeerId);
+        const dvgProgramString = `
+            LABEL START
+            COLOR 1
+            LABS 100 100 1
+            VCTR 50 50 1 8
+            JMPL START
+        `;
+        const desiredVPS = 1000; // Optional
 
-        // Prepare your DVG commands (see DVG Command Reference)
-        // These ops can be generated from DVG assembly text or created directly as JSON.
-        const dvgOps = [
-            // Example: A simple square that draws once
-            { opcode: 'COLOR', color: 1 },
-            { opcode: 'LABS', x: 100, y: 100, scale: 1 },
-            { opcode: 'VCTR', x: 50, y: 0, divisor: 1, intensity: 8 },
-            { opcode: 'VCTR', x: 0, y: 50, divisor: 1, intensity: 8 },
-            { opcode: 'VCTR', x: -50, y: 0, divisor: 1, intensity: 8 },
-            { opcode: 'VCTR', x: 0, y: -50, divisor: 1, intensity: 8 },
-            // For a persistent image, you'd typically include a JMPL to loop.
-            // e.g., { opcode: 'LABEL', name: 'START' }, ...draw ops..., { opcode: 'JMPL', targetLabel: 'START' }
-            // (Note: 'LABEL' is conceptual for JSON; target for JMPL would be a numeric index if sending JSON directly)
-        ];
-
-        conn.send(dvgOps); // Send the commands
-        console.log('DVG commands sent.');
-
-        // You can keep the connection open to send more commands or close it.
+        const payload = {
+            dvgProgramText: dvgProgramString,
+            metadata: {}
+        };
+        if (desiredVPS) {
+            payload.metadata.vps = desiredVPS;
+        }
+        conn.send(payload);
     });
-
-    conn.on('data', (data) => {
-        // Optional: Handle any acknowledgment or data sent back from the monitor
-        console.log('Received from monitor:', data);
-    });
-
-    conn.on('error', (err) => {
-        console.error('Connection error with monitor:', err);
-    });
+    // ... other connection event handlers (data, error, close) ...
     ```
-    Your application needs a way to know the `targetMonitorPeerId`.
+    Your application needs a way to know the `targetMonitorPeerId`. 
+    
+    I suggest generating a random monitor ID for each player, and your app then putting the monitor in a iframe or offering to pop it up.
+
+    The monitor ID could be entered by the user, pre-configured, or discovered if you implement a discovery mechanism.
 
 ## DVG Command Reference
-
-DVG commands are sent as a JSON array of operation objects, or can be written in an assembly-like text format which the example sender can parse. Each operation has an `opcode` and other properties.
+DVG commands are sent as an assembly-like text program. The monitor parses this program for execution.
 
 ### Drawing Opcodes
-
-*   **`COLOR <color_index>`**
-    *   Sets the drawing color. `color_index` is an integer referencing a predefined color palette in the monitor.
-    *   Assembly: `COLOR 1`
-    *   JSON: `{"opcode": "COLOR", "color": <Number>}`
-    *   Example: `{"opcode": "COLOR", "color": 1}` (Sets color to Cyan)
-
-*   **`LABS <x> <y> <scale_factor_index>`**
-    *   Load Absolute: Moves the beam to absolute screen coordinates `(x, y)` without drawing. Sets the global scale factor.
-    *   `x, y`: Absolute screen coordinates (e.g., 0 to canvas width/height).
-    *   `scale_factor_index`: An integer (0-15) that maps to a predefined scaling factor.
-    *   Assembly: `LABS 400 300 1`
-    *   JSON: `{"opcode": "LABS", "x": <Number>, "y": <Number>, "scale": <Number>}`
-
-*   **`VCTR <dx> <dy> <divisor_index> <intensity>`**
-    *   Vector Relative: Draws a line (vector) from the current beam position to `(current_x + dx / divisor, current_y + dy / divisor)`.
-    *   `dx, dy`: Relative change in coordinates.
-    *   `divisor_index`: An integer (0-9) referencing a predefined divisor (e.g., 0 for /1, 1 for /2).
-    *   `intensity`: Beam intensity (0-15), affecting brightness and thickness.
-    *   Assembly: `VCTR 100 50 1 8`
-    *   JSON: `{"opcode": "VCTR", "x": <Number>, "y": <Number>, "divisor": <Number>, "intensity": <Number>}`
-
-*   **`SVEC <dx_s> <dy_s> <scale_s_index> <intensity>`**
-    *   Short Vector Relative: Draws a short vector. `dx_s`, `dy_s` are small integers (0-3), scaled by `scale_s_index`.
-    *   `dx_s, dy_s`: Short vector coordinates (0-3).
-    *   `scale_s_index`: Scale factor for short vector (0-3).
-    *   `intensity`: Beam intensity (0-15).
-    *   Assembly: `SVEC 1 1 0 10`
-    *   JSON: `{"opcode": "SVEC", "x": <Number>, "y": <Number>, "scale": <Number>, "intensity": <Number>}`
-
-*   **`SCALE <scale_factor_index>`**
-    *   Sets the global scale factor, same as the third parameter of `LABS`.
-    *   Assembly: `SCALE 2`
-    *   JSON: `{"opcode": "SCALE", "scale": <Number>}`
-
-*   **`CENTER`**
-    *   Moves the beam to the center of the display without drawing.
-    *   Assembly: `CENTER`
-    *   JSON: `{"opcode": "CENTER"}`
+*   **`COLOR <color_index>`**: Sets drawing color. Example: `COLOR 1`
+*   **`LABS <x> <y> <scale_factor_index>`**: Moves beam to absolute `(x, y)`, sets scale. Example: `LABS 400 300 1`
+*   **`VCTR <dx> <dy> <divisor_index> <intensity>`**: Draws vector relative to current point. Example: `VCTR 100 50 1 8`
+*   **`SVEC <dx_s> <dy_s> <scale_s_index> <intensity>`**: Draws short scaled vector. Example: `SVEC 1 1 0 10`
+*   **`SCALE <scale_factor_index>`**: Sets global scale. Example: `SCALE 2`
+*   **`CENTER`**: Moves beam to center.
 
 ### Program Control Opcodes
-These commands control the flow of the DVG program. They are essential for creating persistent images (via loops) and structured programs (subroutines).
+*   **`LABEL <name>`**: Defines a named location for jumps. Example: `LABEL myLoopStart`
+*   **`JMPL <label>`**: Jumps to specified label. Essential for loops and persistent images. Example: `JMPL myLoopStart`
+*   **`JSRL <label>`**: Jumps to subroutine at label, stores return address. Example: `JSRL drawBoxRoutine`
+*   **`RTSL`**: Returns from subroutine.
+*   **`HALT`**: Halts program execution.
 
-*   **`LABEL <name>` (Assembly Directive)**
-    *   Defines a named location in the DVG program. `LABEL` itself does not generate a sendable `op` object if sending JSON directly, but is used by DVG assembly parsers (like the one in the sender UI or the monitor's editor) to resolve targets for `JMPL` and `JSRL` commands.
-    *   Assembly Syntax: `LABEL myLoopStart`
-
-*   **`JMPL <label>`**
-    *   Jump to Label: Unconditionally sets the program counter to the instruction following the specified `<label>`. This is fundamental for creating loops, which are necessary for persistent images on a vector display (as the image needs to be constantly redrawn).
-    *   Assembly Syntax: `JMPL myLoopStart`
-    *   JSON: `{"opcode": "JMPL", "target": <numeric_address_of_label>}` (Note: When sending JSON directly, the label must be pre-resolved to its numeric instruction index. The sender UI's DVG assembly parser handles this conversion.)
-
-*   **`JSRL <label>`**
-    *   Jump to Subroutine and Link: Pushes the address of the next instruction onto an internal stack and then jumps to the instruction associated with the specified `<label>`. Used for calling reusable sequences of drawing commands (subroutines).
-    *   Assembly Syntax: `JSRL drawBoxRoutine`
-    *   JSON: `{"opcode": "JSRL", "target": <numeric_address_of_label>}` (Label must be pre-resolved for direct JSON.)
-
-*   **`RTSL`**
-    *   Return from Subroutine and Link: Pops an address from the internal stack and sets the program counter to this address. Used to return from a subroutine called by `JSRL`.
-    *   Assembly Syntax: `RTSL`
-    *   JSON: `{"opcode": "RTSL"}`
-
-*   **`HALT`**
-    *   Halts the execution of the DVG program. The display will cease updating further commands in the current program list. Useful to explicitly end a non-looping sequence or to stop drawing.
-    *   Assembly Syntax: `HALT`
-    *   JSON: `{"opcode": "HALT"}`
+*(For direct JSON sending, which is no longer the primary method for the example sender but possible if an application constructs the payload directly, `JMPL` and `JSRL` targets would be numeric indices. `LABEL` is an assembly-time directive.)*
 
 ## Limitations of a (Virtual) Vector Display
 
 *   **No Raster Graphics:** Vector displays draw lines, not filled shapes in the way raster displays do (though complex patterns of lines can simulate fills). They don't directly support pixels or bitmap images.
-*   **Complexity vs. Speed:** The more vectors (lines) in a frame, the longer it takes to draw the entire image. Very complex images may cause flicker if the drawing rate can't keep up with the phosphor decay (i.e., the program loop is too long).
+*   **Complexity vs. Speed:** The more vectors (lines) in a frame, the longer it takes to draw the entire image. Very complex images may cause flicker if the drawing rate can't keep up with the phosphor decay (i.e., the program loop is too long). By default, the web fantasy vector monitor scale up the vector lines per second automatically to ensure both the retro feel and no slowdown.
 *   **Phosphor Simulation:** The "glow" and "decay" are simulations. The decay rate affects how long lines remain visible. If too slow, fast-moving objects create trails; if too fast, the image might flicker.
 *   **Intensity Levels:** The number of distinct brightness/thickness levels is limited.
 *   **Color Palette:** The color palette is predefined and limited.
@@ -223,7 +177,7 @@ These commands control the flow of the DVG program. They are essential for creat
 *   **No Depth Buffering:** Lines are drawn in the order they are received. There's no Z-buffering to handle occlusion of 3D objects automatically.
 
 ## Development Notes
-
 *   The project uses Deno for its simple static server.
 *   PeerJS handles the WebRTC complexity for P2P data channels.
-*   `dvgsim.js` contains the core vector rendering logic and DVG instruction processing.
+*   `dvgsim.js` contains the core vector rendering logic and DVG instruction processing, including parsing DVG assembly.
+```
