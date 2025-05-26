@@ -42,7 +42,7 @@ window.addEventListener('load', () => {
             name: "Looping Square (Default)",
             code: `
 LABEL START
-COLOR 3 ; Red
+COLOR 4 ; Red
 LABS 350 250 1
 VCTR 100 0 1 15
 VCTR 0 100 1 15
