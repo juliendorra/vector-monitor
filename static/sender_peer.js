@@ -1,11 +1,13 @@
+import { nanoid, customAlphabet } from 'https://cdn.jsdelivr.net/npm/nanoid@4.0.2/+esm'
+
 // DVG Syntax Highlighting Mode for CodeMirror
-if (window.CodeMirror) { 
-    CodeMirror.defineMode("dvg", function() {
+if (window.CodeMirror) {
+    CodeMirror.defineMode("dvg", function () {
         const keywords = /^(VCTR|LABS|COLOR|SCALE|CENTER|JMPL|JSRL|RTSL|HALT|SVEC|LABEL)\b/i;
-        const labelRegex = /^[a-zA-Z_][a-zA-Z0-9_]*/; 
+        const labelRegex = /^[a-zA-Z_][a-zA-Z0-9_]*/;
         return {
-            startState: function() { return { lastOpcode: null }; },
-            token: function(stream, state) {
+            startState: function () { return { lastOpcode: null }; },
+            token: function (stream, state) {
                 if (stream.eatSpace()) return null;
                 if (stream.peek() === ';') { stream.skipToEnd(); return "comment"; }
                 if (stream.match(/^-?[0-9]+\b/)) return "number";
@@ -14,7 +16,7 @@ if (window.CodeMirror) {
                 if (state.lastOpcode === "LABEL" || state.lastOpcode === "JMPL" || state.lastOpcode === "JSRL") {
                     if (stream.match(labelRegex)) { state.lastOpcode = null; return "variable-2"; }
                 }
-                stream.next(); return null; 
+                stream.next(); return null;
             }
         };
     });
@@ -23,7 +25,7 @@ if (window.CodeMirror) {
 window.addEventListener('load', () => {
     const targetPeerIdInput = document.getElementById('targetPeerId');
     const desiredVpsInput = document.getElementById('desiredVps');
-    const dvgCommandsEditorTextarea = document.getElementById('dvgCommandsEditor'); 
+    const dvgCommandsEditorTextarea = document.getElementById('dvgCommandsEditor');
     const connectAndSendButton = document.getElementById('connectAndSendButton');
     const senderStatusDiv = document.getElementById('senderStatus');
     const myPeerIdDisplayDiv = document.getElementById('myPeerIdDisplay');
@@ -33,7 +35,7 @@ window.addEventListener('load', () => {
 
     let peer = null;
     let currentConnection = null;
-    let editor = null; 
+    let editor = null;
 
     const exampleScripts = [
         {
@@ -199,9 +201,9 @@ JMPL START
     ];
 
     let generatePeerId;
-    if (window.nanoid && typeof window.nanoid.customAlphabet === 'function') {
+    if (nanoid && customAlphabet) {
         const alphabet = "123456789bcdfghjkmnpqrstvwxyz";
-        generatePeerId = window.nanoid.customAlphabet(alphabet, 12);
+        generatePeerId = customAlphabet(alphabet, 12);
     } else {
         console.warn('NanoID library not found. "Generate New ID" button will be disabled.');
         if (createNewMonitorButton) { createNewMonitorButton.disabled = true; createNewMonitorButton.title = "NanoID library failed to load."; }
@@ -217,12 +219,12 @@ JMPL START
         editor = CodeMirror.fromTextArea(dvgCommandsEditorTextarea, {
             lineNumbers: true, theme: "material", mode: "dvg"
         });
-        
+
         // Populate dropdown and set default editor content
         if (dvgExamplesSelect && exampleScripts.length > 0) {
             exampleScripts.forEach((example, index) => {
                 const option = document.createElement('option');
-                option.value = index; 
+                option.value = index;
                 option.textContent = example.name;
                 dvgExamplesSelect.appendChild(option);
             });
@@ -239,13 +241,13 @@ JMPL START
             editor.setValue(exampleScripts[0].code); // Set initial content to the first example
             dvgExamplesSelect.value = "0"; // Set dropdown to match
         } else if (exampleScripts.length > 0 && editor) { // Fallback if select isn't found, but editor is
-             editor.setValue(exampleScripts[0].code);
+            editor.setValue(exampleScripts[0].code);
         }
 
 
         editor.setOption("extraKeys", {
-            "Cmd-Enter": function(cm) { connectAndSendButton.click(); },
-            "Ctrl-Enter": function(cm) { connectAndSendButton.click(); }
+            "Cmd-Enter": function (cm) { connectAndSendButton.click(); },
+            "Ctrl-Enter": function (cm) { connectAndSendButton.click(); }
         });
     } else if (dvgCommandsEditorTextarea) { // Fallback if CodeMirror didn't load
         console.error("CodeMirror library not loaded or editor textarea not found. DVG editor will be a plain textarea.");
@@ -255,7 +257,7 @@ JMPL START
     }
 
 
-    function initializeSenderPeer() { /* ... existing peer init logic ... */ 
+    function initializeSenderPeer() { /* ... existing peer init logic ... */
         peer = new Peer();
         peer.on('open', id => { myPeerIdDisplayDiv.textContent = 'My PeerJS ID: ' + id; senderStatusDiv.textContent = 'Status: Ready. My PeerID is ' + id; console.log('Sender PeerJS ID:', id); });
         peer.on('error', err => { console.error('Sender PeerJS error:', err); senderStatusDiv.textContent = 'Status: PeerJS Error - ' + err.type; myPeerIdDisplayDiv.textContent = 'My PeerJS ID: Error'; });
@@ -263,7 +265,7 @@ JMPL START
         peer.on('close', () => { senderStatusDiv.textContent = 'Status: Peer connection closed. Please refresh.'; console.log('Peer connection closed.'); });
     }
 
-    if (createNewMonitorButton) { /* ... existing button logic ... */ 
+    if (createNewMonitorButton) { /* ... existing button logic ... */
         if (generatePeerId) {
             createNewMonitorButton.addEventListener('click', () => {
                 const newId = generatePeerId();
@@ -277,7 +279,7 @@ JMPL START
         } else { createNewMonitorButton.disabled = true; createNewMonitorButton.title = "NanoID library failed to load."; }
     }
 
-    if (openMonitorButton) { /* ... existing button logic ... */ 
+    if (openMonitorButton) { /* ... existing button logic ... */
         openMonitorButton.addEventListener('click', () => {
             const targetId = targetPeerIdInput.value.trim();
             if (targetId) {
@@ -289,10 +291,10 @@ JMPL START
         });
     }
 
-    connectAndSendButton.addEventListener('click', () => { /* ... existing click logic ... */ 
+    connectAndSendButton.addEventListener('click', () => { /* ... existing click logic ... */
         let dvgProgramText;
-        if (editor) { dvgProgramText = editor.getValue(); } 
-        else if (dvgCommandsEditorTextarea) { dvgProgramText = dvgCommandsEditorTextarea.value; } 
+        if (editor) { dvgProgramText = editor.getValue(); }
+        else if (dvgCommandsEditorTextarea) { dvgProgramText = dvgCommandsEditorTextarea.value; }
         else { alert("Code editor element not found!"); senderStatusDiv.textContent = 'Status: Code editor element not found.'; return; }
 
         if (!peer || peer.destroyed) { senderStatusDiv.textContent = 'Status: PeerJS not initialized. Please refresh.'; return; }
