@@ -4,10 +4,10 @@
  * Generates DVG command for absolute positioning.
  * @param {number} x - X coordinate.
  * @param {number} y - Y coordinate.
- * @param {number} scale - Scale factor (defaulting to 2 for 1:1 mapping with divisor 4).
+ * @param {number} scale - Scale factor (0-7, see dvgsim.js scalers array).
  * @returns {string} DVG LABS command.
  */
-function labs(x, y, scale = 2) { // Default scale to 2
+function labs(x, y, scale = 1) {
     return `LABS ${Math.round(x)} ${Math.round(y)} ${scale}`;
 }
 
@@ -15,11 +15,11 @@ function labs(x, y, scale = 2) { // Default scale to 2
  * Generates DVG command for drawing a vector.
  * @param {number} dx - Change in X.
  * @param {number} dy - Change in Y.
- * @param {number} divisor - Divisor for coordinates (defaulting to 4 for 1:1 mapping with scale 2).
+ * @param {number} divisor - Divisor for coordinates (1, 2, 4, ..., 512).
  * @param {number} intensity - Intensity of the beam (0-15).
  * @returns {string} DVG VCTR command.
  */
-function vctr(dx, dy, divisor = 4, intensity = 8) { // Default divisor to 4
+function vctr(dx, dy, divisor = 1, intensity = 8) {
     return `VCTR ${Math.round(dx)} ${Math.round(dy)} ${divisor} ${intensity}`;
 }
 
@@ -44,26 +44,20 @@ function color(colorIndex) {
  */
 export function drawPlayer(centerX, centerY, size, colorIndex, intensity) {
     const commands = [];
-    // Player points towards positive Y (screen top). centerY is the center.
-    // Tip: (centerX, centerY + size * 2/3)
-    // Left base: (centerX - size / 2, centerY - size / 3)
-    // Right base: (centerX + size / 2, centerY - size / 3)
-    const tipYOffset = size * 2 / 3;
-    const baseYOffset = -size * 1 / 3; // Relative to centerY
+    // Triangle points:
+    // Tip: (centerX, centerY - size * 2/3)
+    // Left base: (centerX - size / 2, centerY + size / 3)
+    // Right base: (centerX + size / 2, centerY + size / 3)
+
+    const tipY = centerY - (size * 2 / 3);
+    const baseY = centerY + (size / 3);
     const halfWidth = size / 2;
 
-    const actualTipY = centerY + tipYOffset;
-    const actualBaseY = centerY + baseYOffset;
-
     commands.push(color(colorIndex));
-    // Start at left base
-    commands.push(labs(centerX - halfWidth, actualBaseY, 2));
-    // Draw base to right base
-    commands.push(vctr(size, 0, 4, intensity));
-    // Draw from right base to tip
-    commands.push(vctr(-halfWidth, tipYOffset - baseYOffset, 4, intensity)); // dx = -halfWidth, dy = (centerY + tipYOffset) - (centerY + baseYOffset) = tipYOffset - baseYOffset
-    // Draw from tip to left base
-    commands.push(vctr(-halfWidth, baseYOffset - tipYOffset, 4, intensity)); // dx = -halfWidth, dy = (centerY + baseYOffset) - (centerY + tipYOffset) = baseYOffset - tipYOffset
+    commands.push(labs(centerX - halfWidth, baseY)); // Move to left base
+    commands.push(vctr(halfWidth * 2, 0, 1, intensity)); // Draw base (to right base)
+    commands.push(vctr(-halfWidth, -(size), 1, intensity));    // Draw right side (to tip)
+    commands.push(vctr(-halfWidth, size, 1, intensity));    // Draw left side (back to left base)
 
     return commands;
 }
@@ -78,12 +72,10 @@ export function drawPlayer(centerX, centerY, size, colorIndex, intensity) {
  * @returns {string[]} Array of DVG commands.
  */
 export function drawProjectile(x, y, length, colorIndex, intensity) {
-    // x, y is the starting point (base) of the projectile line.
-    // It shoots "up" (positive Y).
     const commands = [];
     commands.push(color(colorIndex));
-    commands.push(labs(x, y, 2)); // Start at base of projectile
-    commands.push(vctr(0, length, 4, intensity)); // Draw line upwards
+    commands.push(labs(x, y));
+    commands.push(vctr(0, length, 1, intensity));
     return commands;
 }
 
@@ -101,14 +93,12 @@ export function drawEnemySquare(centerX, centerY, size, colorIndex, intensity) {
     const halfSize = size / 2;
 
     commands.push(color(colorIndex));
-    // Start at top-left: (centerX - halfSize, centerY + halfSize) for positive Y up
-    // For consistency, let's use a common starting point like bottom-left
-    // Start at bottom-left: (centerX - halfSize, centerY - halfSize)
-    commands.push(labs(centerX - halfSize, centerY - halfSize, 2));
-    commands.push(vctr(size, 0, 4, intensity));      // Bottom edge (to bottom-right)
-    commands.push(vctr(0, size, 4, intensity));      // Right edge (to top-right)
-    commands.push(vctr(-size, 0, 4, intensity));     // Top edge (to top-left)
-    commands.push(vctr(0, -size, 4, intensity));     // Left edge (back to bottom-left)
+    // Start at top-left
+    commands.push(labs(centerX - halfSize, centerY - halfSize));
+    commands.push(vctr(size, 0, 1, intensity));      // Top edge
+    commands.push(vctr(0, size, 1, intensity));      // Right edge
+    commands.push(vctr(-size, 0, 1, intensity));     // Bottom edge
+    commands.push(vctr(0, -size, 1, intensity));     // Left edge (back to start)
     return commands;
 }
 
@@ -126,13 +116,12 @@ export function drawEnemyX(centerX, centerY, size, colorIndex, intensity) {
     const halfSize = Math.round(size / 2); // Or use full size for arm length
 
     commands.push(color(colorIndex));
-    // Draw '\' (from top-left to bottom-right)
-    commands.push(labs(centerX - halfSize, centerY + halfSize, 2)); // Start top-left
-    commands.push(vctr(size, -size, 4, intensity)); // Draw to bottom-right
-
-    // Draw '/' (from bottom-left to top-right)
-    commands.push(labs(centerX - halfSize, centerY - halfSize, 2)); // Start bottom-left
-    commands.push(vctr(size, size, 4, intensity));    // Draw to top-right
+    // Draw ''
+    commands.push(labs(centerX - halfSize, centerY - halfSize));
+    commands.push(vctr(size, size, 1, intensity));
+    // Draw '/'
+    commands.push(labs(centerX - halfSize, centerY + halfSize));
+    commands.push(vctr(size, -size, 1, intensity));
     return commands;
 }
 
@@ -154,13 +143,13 @@ export function drawHatch(x, y, width, height, spacing, colorIndex, intensity, i
 
     if (isVertical) {
         for (let currentX = x; currentX <= x + width; currentX += spacing) {
-            commands.push(labs(currentX, y, 2));
-            commands.push(vctr(0, height, 4, intensity));
+            commands.push(labs(currentX, y));
+            commands.push(vctr(0, height, 1, intensity));
         }
     } else { // Horizontal
         for (let currentY = y; currentY <= y + height; currentY += spacing) {
-            commands.push(labs(x, currentY, 2));
-            commands.push(vctr(width, 0, 4, intensity));
+            commands.push(labs(x, currentY));
+            commands.push(vctr(width, 0, 1, intensity));
         }
     }
     return commands;
@@ -172,12 +161,11 @@ export function drawText(text, x, y, size, colorIndex, intensity) {
     const commands = [];
     // Actual text rendering requires a font definition (set of vector paths for each char)
     // For now, let's draw a small square as a placeholder for where text would be.
-    // Assuming x,y is bottom-left corner of the text placeholder.
     commands.push(color(colorIndex));
-    commands.push(labs(x, y, 2));
-    commands.push(vctr(size, 0, 4, intensity));    // Bottom edge
-    commands.push(vctr(0, size, 4, intensity));    // Right edge
-    commands.push(vctr(-size, 0, 4, intensity));   // Top edge
-    commands.push(vctr(0, -size, 4, intensity));   // Left edge
+    commands.push(labs(x, y));
+    commands.push(vctr(size, 0, 1, intensity));
+    commands.push(vctr(0, size, 1, intensity));
+    commands.push(vctr(-size, 0, 1, intensity));
+    commands.push(vctr(0, -size, 1, intensity));
     return commands;
 }

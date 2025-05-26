@@ -79,6 +79,13 @@ function setupConnectionHandler() {
 		conn.on('open', () => conn.send('Hello from monitor! Connection established.'));
 		conn.on('data', (payload) => {
 			console.log('Received payload from ' + conn.peer + ':', payload);
+
+			// Handle initial string handshake messages gracefully
+			if (typeof payload === 'string') {
+				console.log('Received string message (e.g., handshake):', payload);
+				return; // Ignore string messages for DVG processing
+			}
+
 			if (!payload || typeof payload !== 'object') {
 				console.error('Invalid payload structure, expected an object.'); return;
 			}
