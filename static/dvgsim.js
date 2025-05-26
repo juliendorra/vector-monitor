@@ -157,10 +157,8 @@ function setupConnectionHandler() {
               break;
             case 'LABS':
               // Assuming opData.x and opData.y are absolute coordinates for the DVG display
-              newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale);
-              // For text display in editor, if they were relative in editor, they'd need conversion here.
-              // But since parseProgram now expects absolute, let's keep it simple.
-              currentOpText += ` ${opData.x - (canvasElement.width/2)} ${opData.y - (canvasElement.height/2)} ${opData.scale}`;
+              newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale); // Uses direct values for constructor
+              currentOpText += ` ${opData.x} ${opData.y} ${opData.scale}`; // Uses direct values for text display in editor
               break;
             case 'SCALE':
               newOp = new vecOp(opData.opcode, opData.scale);
@@ -199,6 +197,7 @@ function setupConnectionHandler() {
 
         pc = 0;
         HALT_FLAG = 0;
+        lastIntensity = 8; // Reset lastIntensity for the new program
         if (canvasElement) {
             lastPoint.x = canvasElement.width / 2;
             lastPoint.y = canvasElement.height / 2;
@@ -225,6 +224,8 @@ function setupConnectionHandler() {
 // --- End PeerJS Integration ---
 
 function mainLoop() {
+    // Phosphor fade-out - CRITICAL: ensure source-over for decay
+    DVG.globalCompositeOperation = "source-over"; 
 	DVG.fillStyle = "rgba(0,0,0," + pDecay + ")";
 	DVG.fillRect(0, 0, canvasElement.width, canvasElement.height);
 
