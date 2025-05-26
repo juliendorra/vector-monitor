@@ -133,83 +133,146 @@ function setupConnectionHandler() {
       conn.send('Hello from monitor! Connection established.');
     });
 
-    conn.on('data', (data) => {
-      console.log('Received data from ' + conn.peer + ':', data);
+    conn.on('data', (payload) => { // Renamed 'data' to 'payload' for clarity with instructions
+      console.log('Received payload from ' + conn.peer + ':', payload);
       
-      const newOpsData = data; 
-
-      if (Array.isArray(newOpsData)) {
-        program = []; 
-        let programText = ""; 
-
-        newOpsData.forEach(opData => {
-          let currentOpText = opData.opcode;
-          let newOp;
-
-          switch(opData.opcode) {
-            case 'VCTR':
-              newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.divisor, opData.intensity);
-              currentOpText += ` ${opData.x} ${opData.y} ${opData.divisor} ${opData.intensity}`;
-              break;
-            case 'SVEC':
-              newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale, opData.intensity);
-              currentOpText += ` ${opData.x} ${opData.y} ${opData.scale} ${opData.intensity}`;
-              break;
-            case 'LABS':
-              // Assuming opData.x and opData.y are absolute coordinates for the DVG display
-              newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale); // Uses direct values for constructor
-              currentOpText += ` ${opData.x} ${opData.y} ${opData.scale}`; // Uses direct values for text display in editor
-              break;
-            case 'SCALE':
-              newOp = new vecOp(opData.opcode, opData.scale);
-              currentOpText += ` ${opData.scale}`;
-              break;
-            case 'COLOR':
-              newOp = new vecOp(opData.opcode, opData.color);
-              currentOpText += ` ${opData.color}`;
-              break;
-            case 'CENTER':
-              newOp = new vecOp(opData.opcode);
-              break;
-            case 'JMPL':
-            case 'JSRL':
-              newOp = new vecOp(opData.opcode, opData.target);
-              currentOpText += ` ${opData.target}`; // Target is an index, not a label string here
-              break;
-            case 'HALT':
-            case 'RTSL':
-              newOp = new vecOp(opData.opcode);
-              break;
-            default:
-              console.warn('Unknown opcode received via PeerJS:', opData.opcode);
-              return; 
-          }
-          if (newOp) {
-            program.push(newOp);
-          }
-          programText += currentOpText + '\n';
-        });
-
-        const progEditor = document.getElementById('progEditor');
-        if (progEditor) {
-          progEditor.value = programText.trim();
-        }
-
-        pc = 0;
-        HALT_FLAG = 0;
-        lastIntensity = 8; // Reset lastIntensity for the new program
-        if (canvasElement) {
-            lastPoint.x = canvasElement.width / 2;
-            lastPoint.y = canvasElement.height / 2;
-            if (DVG) { 
-                DVG.moveTo(lastPoint.x, lastPoint.y);
-                DVG.beginPath();
-            }
-        }
-        console.log("Program updated from PeerJS. New program length:", program.length);
-      } else {
-        console.warn('Received data via PeerJS is not an array:', newOpsData);
+      // Assuming 'payload' is the received object from PeerJS
+      // If it could be a string, add:
+      // if (typeof payload === 'string') { try { payload = JSON.parse(payload); } catch(e) { console.error('Failed to parse payload JSON', e); return; } }
+      if (!payload || typeof payload !== 'object') { 
+        console.error('Invalid payload structure, expected an object.'); 
+        return; 
       }
+
+      const receivedOps = payload.ops;
+      const receivedLabels = payload.labels || {}; // Extract labels, default to empty object
+      const receivedMetadata = payload.metadata || {}; 
+
+      if (!Array.isArray(receivedOps)) {
+          console.error('Received ops is not an array:', receivedOps);
+          return; 
+      }
+
+      // Create reverse label map
+      const indexToLabelName = {};
+      if (receivedLabels) {
+          for (const labelName in receivedLabels) {
+              if (Object.prototype.hasOwnProperty.call(receivedLabels, labelName)) {
+                  indexToLabelName[receivedLabels[labelName]] = labelName;
+              }
+          }
+      }
+      console.log("Constructed indexToLabelName map:", indexToLabelName);
+
+      // Calculate maxOps
+      const MAX_POSSIBLE_MAX_OPS = 200; // Ceiling for maxOps (e.g., 10000 Displayed VPS at 50 FPS)
+      const MIN_MAX_OPS = 1;            // Ensure maxOps is at least 1
+
+      // Calculate maxOps based on program length (aim for roughly 0.8 * length to show quickly)
+      let maxOpsForProgram = MIN_MAX_OPS;
+      if (receivedOps.length > 0) {
+          maxOpsForProgram = Math.max(MIN_MAX_OPS, Math.round(receivedOps.length * 0.8));
+      }
+      
+      let currentOverallMaxOpsSetting = MAX_POSSIBLE_MAX_OPS; // Default overall cap
+
+      if (receivedMetadata.vps && typeof receivedMetadata.vps === 'number' && receivedMetadata.vps > 0) {
+          // Assuming mainLoop runs roughly 50 times per second (setInterval(mainLoop, 20ms))
+          const vpsFromMetadata = Math.max(MIN_MAX_OPS, Math.round(receivedMetadata.vps / 50)); 
+          currentOverallMaxOpsSetting = Math.min(vpsFromMetadata, MAX_POSSIBLE_MAX_OPS);
+      }
+
+      // Update the global maxOps variable
+      maxOps = Math.max(MIN_MAX_OPS, Math.min(maxOpsForProgram, currentOverallMaxOpsSetting));
+      
+      console.log(`Adjusted maxOps to: ${maxOps} (Program length: ${receivedOps.length}, Metadata VPS: ${receivedMetadata.vps || 'N/A'})`);
+      // Update the VPS display in the UI if it exists
+      if (vps) { // vps is the span element for displaying Vectors Per Second
+        vps.innerHTML = maxOps * 50; // Assuming 50 FPS for display purposes
+      }
+
+
+      // Existing logic to process receivedOps (formerly newOpsData)
+      program = []; 
+      let programText = ""; 
+
+      if (receivedOps) {
+          for (let i = 0; i < receivedOps.length; i++) {
+              const opData = receivedOps[i];
+              let newOp; // vecOp for the program array
+
+              // Prepend LABEL if one exists for this instruction index
+              if (indexToLabelName[i]) {
+                  programText += `LABEL ${indexToLabelName[i]}\n`;
+              }
+
+              let currentOpText = opData.opcode; // Text for the editor
+              switch(opData.opcode) {
+                  case 'VCTR':
+                      newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.divisor, opData.intensity);
+                      currentOpText += ` ${opData.x} ${opData.y} ${opData.divisor} ${opData.intensity}`;
+                      break;
+                  case 'SVEC':
+                      newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale, opData.intensity);
+                      currentOpText += ` ${opData.x} ${opData.y} ${opData.scale} ${opData.intensity}`;
+                      break;
+                  case 'LABS':
+                      newOp = new vecOp(opData.opcode, opData.x, opData.y, opData.scale); 
+                      currentOpText += ` ${opData.x} ${opData.y} ${opData.scale}`; 
+                      break;
+                  case 'SCALE':
+                      newOp = new vecOp(opData.opcode, opData.scale);
+                      currentOpText += ` ${opData.scale}`;
+                      break;
+                  case 'COLOR':
+                      newOp = new vecOp(opData.opcode, opData.color);
+                      currentOpText += ` ${opData.color}`;
+                      break;
+                  case 'CENTER':
+                      newOp = new vecOp(opData.opcode);
+                      // No arguments for text
+                      break;
+                  case 'JMPL':
+                  case 'JSRL':
+                      newOp = new vecOp(opData.opcode, opData.target); // target is numeric
+                      const targetLabelName = indexToLabelName[opData.target];
+                      currentOpText += ` ${targetLabelName !== undefined ? targetLabelName : opData.target}`;
+                      break;
+                  case 'RTSL':
+                  case 'HALT':
+                      newOp = new vecOp(opData.opcode);
+                      // No arguments for text
+                      break;
+                  default:
+                      console.warn('Unknown opcode received via PeerJS for program text generation:', opData.opcode);
+                      // Skip this opData by not creating a newOp in this iteration
+                      continue; 
+              }
+              if (newOp) {
+                program.push(newOp);
+              }
+              programText += currentOpText + '\n';
+          }
+      }
+      
+      const progEditor = document.getElementById('progEditor');
+      if (progEditor) {
+        progEditor.value = programText.trim();
+      }
+
+      pc = 0;
+      HALT_FLAG = 0;
+      lastIntensity = 8; 
+      if (canvasElement) {
+          lastPoint.x = canvasElement.width / 2;
+          lastPoint.y = canvasElement.height / 2;
+          if (DVG) { 
+              DVG.moveTo(lastPoint.x, lastPoint.y);
+              DVG.beginPath();
+          }
+      }
+      console.log("Program updated from PeerJS. New program length:", program.length);
+      // No longer checking 'isArray(newOpsData)' here as it's checked earlier with 'receivedOps'
     });
 
     conn.on('close', () => {
