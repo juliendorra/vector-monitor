@@ -316,7 +316,7 @@ JMPL START
                 const newId = generatePeerId();
                 targetPeerIdInput.value = newId;
                 localStorage.setItem('targetPeerId', newId);
-                const monitorPagePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/static/')) + '/static/monitor_display.html';
+                const monitorPagePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/static/')) + '/monitor_display.html';
                 const newMonitorUrl = `${window.location.origin}${monitorPagePath}?peerId=${newId}`;
                 console.log(`New Monitor URL: ${newMonitorUrl}`);
                 senderStatusDiv.innerHTML = `Status: Generated Monitor ID: <b>${newId}</b>. URL: <a href="${newMonitorUrl}" target="_blank">${newMonitorUrl}</a>`;
@@ -328,7 +328,7 @@ JMPL START
         openMonitorButton.addEventListener('click', () => {
             const targetId = targetPeerIdInput.value.trim();
             if (targetId) {
-                const monitorPagePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/static/')) + '/static/monitor_display.html';
+                const monitorPagePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/static/')) + '/monitor_display.html';
                 const monitorUrl = `${window.location.origin}${monitorPagePath}?peerId=${targetId}`;
                 window.open(monitorUrl, '_blank');
                 senderStatusDiv.textContent = `Status: Attempting to open monitor with ID: ${targetId}`;
