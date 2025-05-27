@@ -63,7 +63,7 @@ function gameLoop(currentTime) {
     // --- END DEBUG LOGGING ---
 
     if (currentGameState === 'playing') {
-        dvgCommands.push(...vector.drawPlayer(playerState.x, playerState.y, game.PLAYER_SIZE, playerState.color, playerState.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
+        dvgCommands.push(...vector.drawPlayer(playerState.x, playerState.y, playerState.width, playerState.color, playerState.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
 
         projectilesState.forEach(p => {
             dvgCommands.push(...vector.drawProjectile(p.x, p.y, game.PROJECTILE_LENGTH, p.color, p.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
@@ -71,9 +71,9 @@ function gameLoop(currentTime) {
 
         enemiesState.forEach(e => {
             if (e.type === 'square') {
-                dvgCommands.push(...vector.drawEnemySquare(e.x, e.y, game.ENEMY_SIZE, e.color, e.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
+                dvgCommands.push(...vector.drawEnemySquare(e.x, e.y, e.width, e.color, e.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
             } else if (e.type === 'x') {
-                dvgCommands.push(...vector.drawEnemyX(e.x, e.y, game.ENEMY_SIZE, e.color, e.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
+                dvgCommands.push(...vector.drawEnemyX(e.x, e.y, e.width, e.color, e.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
             }
         });
 

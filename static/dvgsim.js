@@ -78,6 +78,7 @@ function setupConnectionHandler() {
 	peer.on('connection', (conn) => {
 		conn.on('open', () => conn.send('Hello from monitor! Connection established.'));
 		conn.on('data', (payload) => {
+			const indicativeFrameRate = 50; // Define here
 			console.log('Received payload from ' + conn.peer + ':', payload);
 
 			// Handle initial string handshake messages gracefully
@@ -118,8 +119,7 @@ function setupConnectionHandler() {
 
 			if (receivedMetadata.vps && typeof receivedMetadata.vps === 'number' && receivedMetadata.vps > 0) {
 				// Assuming mainLoop runs roughly 50 times per second (setInterval(mainLoop, 20))
-
-				const indicativeFrameRate = 50;
+				// const indicativeFrameRate = 50; // No longer defined here, moved to top of function
 
 				const vpsFromMetadata = Math.max(MIN_MAX_OPS, Math.round(receivedMetadata.vps / indicativeFrameRate));
 

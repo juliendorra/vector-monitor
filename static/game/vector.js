@@ -13,10 +13,20 @@ const DVG_SCALE_INDEX_1X = 2; // Assuming scalers[2] is 1.0x
  * @returns {{x: number, y: number}} DVG coordinates.
  */
 function toDVGCoords(gameX, gameY, gameWidth, gameHeight) {
-    return {
+    // --- BEGIN VECTOR.JS DIAGNOSTIC LOGGING ---
+    console.log(`[vector.js toDVGCoords] called with: 
+            gameX=${gameX} (type: ${typeof gameX}), 
+            gameY=${gameY} (type: ${typeof gameY}), 
+            gameWidth=${gameWidth} (type: ${typeof gameWidth}), 
+            gameHeight=${gameHeight} (type: ${typeof gameHeight})`);
+    // --- END VECTOR.JS DIAGNOSTIC LOGGING ---
+    const result = {
         x: Math.round(gameX - gameWidth / 2),
         y: Math.round(gameY - gameHeight / 2) // Y increases downwards from center
     };
+    // Log the result as well
+    console.log(`[vector.js toDVGCoords] result: x=${result.x}, y=${result.y}`);
+    return result;
 }
 
 /**
@@ -64,6 +74,16 @@ function color(colorIndex) {
  * @returns {string[]} Array of DVG commands.
  */
 export function drawPlayer(gameCenterX, gameCenterY, size, colorIndex, intensity, gameWidth, gameHeight) {
+    // --- BEGIN VECTOR.JS DIAGNOSTIC LOGGING ---
+    console.log(`[vector.js drawPlayer] called with: 
+            gameCenterX=${gameCenterX} (type: ${typeof gameCenterX}), 
+            gameCenterY=${gameCenterY} (type: ${typeof gameCenterY}), 
+            size=${size} (type: ${typeof size}), 
+            colorIndex=${colorIndex} (type: ${typeof colorIndex}), 
+            intensity=${intensity} (type: ${typeof intensity}), 
+            gameWidth=${gameWidth} (type: ${typeof gameWidth}), 
+            gameHeight=${gameHeight} (type: ${typeof gameHeight})`);
+    // --- END VECTOR.JS DIAGNOSTIC LOGGING ---
     const commands = [];
 
     // Game coordinates for the triangle points
