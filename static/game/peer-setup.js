@@ -70,12 +70,12 @@ function connectToMonitor() {
     });
 }
 
-function sendDVGCommands(dvgString, vps = 2000) {
+function sendDVGCommands(dvgString, vps = 200) {
     if (gameConnection && gameConnection.open) {
         const payload = {
             dvgProgramText: dvgString,
             metadata: {
-                vps: vps
+                // vps: vps // let the monitor adjust the ops per seconds
             }
         };
         gameConnection.send(payload);
