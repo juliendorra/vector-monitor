@@ -47,6 +47,21 @@ function gameLoop(currentTime) {
     const score = game.getScore();
     const lives = game.getLives();
 
+    // --- BEGIN DEBUG LOGGING ---
+    const playerStateForLog = game.getPlayerState();
+    const enemiesStateForLog = game.getEnemiesState();
+
+    console.log(`[GameLoop Debug] Player State: x=${playerStateForLog.x}, y=${playerStateForLog.y}, color=${playerStateForLog.color}, intensity=${playerStateForLog.intensity}, size=${game.PLAYER_SIZE}`);
+
+    if (enemiesStateForLog.length > 0) {
+        enemiesStateForLog.forEach((enemy, index) => {
+            console.log(`[GameLoop Debug] Enemy ${index}: x=${enemy.x}, y=${enemy.y}, type=${enemy.type}, color=${enemy.color}, intensity=${enemy.intensity}, active=${enemy.active}, size=${game.ENEMY_SIZE}`);
+        });
+    } else {
+        console.log("[GameLoop Debug] No active enemies.");
+    }
+    // --- END DEBUG LOGGING ---
+
     if (currentGameState === 'playing') {
         dvgCommands.push(...vector.drawPlayer(playerState.x, playerState.y, game.PLAYER_SIZE, playerState.color, playerState.intensity));
 
