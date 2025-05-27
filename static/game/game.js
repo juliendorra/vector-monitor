@@ -3,6 +3,9 @@
 // Game constants (can be adjusted)
 export const GAME_WIDTH = 800; // Assumed virtual width for game logic
 export const GAME_HEIGHT = 600; // Assumed virtual height for game logic
+// --- BEGIN DIAGNOSTIC LOGGING ---
+console.log(`[game.js] Initial GAME_WIDTH: ${GAME_WIDTH}, GAME_HEIGHT: ${GAME_HEIGHT}`);
+// --- END DIAGNOSTIC LOGGING ---
 const PLAYER_SPEED = 5;
 const PROJECTILE_SPEED = 7;
 const ENEMY_SPEED = 2;
@@ -34,6 +37,11 @@ let gameState = 'playing'; // 'playing', 'gameOver'
 
 // Initialization function
 export function initGame(levelData) {
+    // --- BEGIN DIAGNOSTIC LOGGING ---
+    console.log('[game.js initGame] Called. GAME_WIDTH:', GAME_WIDTH, 'GAME_HEIGHT:', GAME_HEIGHT);
+    console.log('[game.js initGame] Received levelData:', JSON.stringify(levelData, null, 2));
+    // --- END DIAGNOSTIC LOGGING ---
+
     // Reset player
     player.x = GAME_WIDTH / 2;
     player.y = GAME_HEIGHT - 50;
@@ -47,6 +55,9 @@ export function initGame(levelData) {
     // Load enemies from level data (simple example)
     if (levelData && levelData.enemies) {
         levelData.enemies.forEach(enemyConfig => {
+            // --- BEGIN DIAGNOSTIC LOGGING ---
+            console.log(`[game.js initGame forEach] Processing enemyConfig: x=${enemyConfig.x}, y=${enemyConfig.y}, type=${enemyConfig.type}`);
+            // --- END DIAGNOSTIC LOGGING ---
             spawnEnemy(enemyConfig.x, enemyConfig.y, enemyConfig.type || 'square', enemyConfig.color || 2, enemyConfig.intensity || 10);
         });
     } else {
