@@ -16,6 +16,9 @@ let dvgCommands = [];
 
 let sendDVGToMonitor; // Will be initialized by startGame
 
+// Restart key handling
+let restartKeyPressed = false;
+
 function gameLoop(currentTime) {
     animationFrameId = requestAnimationFrame(gameLoop);
 
@@ -33,6 +36,14 @@ function gameLoop(currentTime) {
         isRightArrowDown: input.isRightArrowDown,
         isSpaceBarDown: input.isSpaceBarDown
     };
+
+    // Handle restart key (R) - only trigger on key press, not hold
+    const currentRestartKeyState = input.isRKeyDown();
+    if (currentRestartKeyState && !restartKeyPressed) {
+        console.log('Restart key pressed - restarting game');
+        game.restartGame();
+    }
+    restartKeyPressed = currentRestartKeyState;
 
     // 2. Update Game State
     game.updateGame(playerInput);

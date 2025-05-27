@@ -2,6 +2,7 @@
 
 import { initializeInput } from './input.js';
 import { startGame } from './main.js';
+import { restartGame } from './game.js';
 
 let peer = null;
 let gameConnection = null;
@@ -84,8 +85,56 @@ function sendDVGCommands(dvgString, vps = 200) {
         // connectToMonitor(); // Attempt to reconnect if not connected
     }
 }
+
+// Setup global key capture for restart key only, while ensuring iframe doesn't steal focus
+function setupGlobalKeyCapture() {
+    // Prevent iframe from taking focus away from key events
+    const monitorFrame = document.getElementById('monitorFrame');
+    if (monitorFrame) {
+        // Make iframe non-focusable initially
+        monitorFrame.style.pointerEvents = 'none';
+        
+        // Re-enable pointer events after a short delay to allow monitor to load
+        setTimeout(() => {
+            monitorFrame.style.pointerEvents = 'auto';
+            // But prevent the iframe from taking keyboard focus
+            monitorFrame.setAttribute('tabindex', '-1');
+        }, 3000);
+    }
+
+    // Only capture the restart key globally, let other keys be handled by input.js
+    document.addEventListener('keydown', (event) => {
+        // Only handle restart key globally
+        if (event.code === 'KeyR' || event.key === 'r' || event.key === 'R') {
+            event.preventDefault();
+            event.stopPropagation();
+            console.log('Restart key detected at document level');
+            restartGame();
+        }
+        // Let all other keys pass through to input.js normally
+    }, true); // Use capture phase for restart key
+
+    // Ensure the main window maintains focus for keyboard events
+    window.addEventListener('blur', () => {
+        // When window loses focus, try to regain it after a short delay
+        setTimeout(() => {
+            window.focus();
+        }, 100);
+    });
+
+    // Ensure the main window has focus initially
+    window.focus();
+    
+    // Also ensure document body can receive focus
+    document.body.setAttribute('tabindex', '0');
+    document.body.focus();
+}
+
 // Expose sendDVGCommands to be used by main.js (or other modules)
 window.sendDVGCommandsFromGameHTML = sendDVGCommands;
+
+// Expose restart function globally for easy access
+window.restartVectorGame = restartGame;
 
 document.addEventListener('DOMContentLoaded', () => {
     const monitorFrame = document.getElementById('monitorFrame');
@@ -95,7 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
     monitorFrame.src = monitorSrc;
     console.log(`Set monitor iframe src to: ${monitorSrc}`);
 
-    initializeInput(); // Initialize input listeners
+    initializeInput(); // Initialize input listeners first
+    setupGlobalKeyCapture(); // Setup global key capture for iframe focus issues
     initializeGamePeer(); // Initialize PeerJS connection for the game
 });
 

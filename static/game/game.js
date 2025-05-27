@@ -9,9 +9,9 @@ console.log(`[game.js] Initial GAME_WIDTH: ${GAME_WIDTH}, GAME_HEIGHT: ${GAME_HE
 const PLAYER_SPEED = 5;
 const PROJECTILE_SPEED = 7;
 const ENEMY_SPEED = 2;
-const PLAYER_SIZE = 30; // Used for drawing and simple collision
-const PROJECTILE_LENGTH = 20;
-const ENEMY_SIZE = 30;
+export const PLAYER_SIZE = 30; // Used for drawing and simple collision
+export const PROJECTILE_LENGTH = 20;
+export const ENEMY_SIZE = 30;
 const MAX_PROJECTILES = 5;
 
 // Player state
@@ -23,7 +23,7 @@ let player = {
     score: 0,
     lives: 3,
     color: 4, // Example color index (e.g., red from dvgsim)
-    intensity: 15
+    intensity: 5
 };
 
 // Projectiles state
@@ -35,6 +35,9 @@ let enemies = []; // Array of {x, y, type, width, height, active, color, intensi
 // Game state
 let gameState = 'playing'; // 'playing', 'gameOver'
 
+// Store the current level data for restart functionality
+let currentLevelData = null;
+
 // Initialization function
 export function initGame(levelData) {
     // --- BEGIN DIAGNOSTIC LOGGING ---
@@ -42,11 +45,14 @@ export function initGame(levelData) {
     console.log('[game.js initGame] Received levelData:', JSON.stringify(levelData, null, 2));
     // --- END DIAGNOSTIC LOGGING ---
 
+    // Store level data for restart
+    currentLevelData = levelData;
+
     // Reset player
     player.x = GAME_WIDTH / 2;
     player.y = GAME_HEIGHT - 50;
     player.score = 0;
-    player.lives = 3; // Or from levelData
+    player.lives = levelData?.player?.initialLives || 3;
 
     // Clear arrays
     projectiles = [];
@@ -58,7 +64,7 @@ export function initGame(levelData) {
             // --- BEGIN DIAGNOSTIC LOGGING ---
             console.log(`[game.js initGame forEach] Processing enemyConfig: x=${enemyConfig.x}, y=${enemyConfig.y}, type=${enemyConfig.type}`);
             // --- END DIAGNOSTIC LOGGING ---
-            spawnEnemy(enemyConfig.x, enemyConfig.y, enemyConfig.type || 'square', enemyConfig.color || 2, enemyConfig.intensity || 10);
+            spawnEnemy(enemyConfig.x, enemyConfig.y, enemyConfig.type || 'square', enemyConfig.color || 2, enemyConfig.intensity || 5);
         });
     } else {
         // Default enemy if no level data
@@ -68,6 +74,17 @@ export function initGame(levelData) {
 
     gameState = 'playing';
     console.log('Game initialized. Player:', player, 'Enemies:', enemies);
+}
+
+// Restart game function
+export function restartGame() {
+    console.log('Restarting game...');
+    if (currentLevelData) {
+        initGame(currentLevelData);
+    } else {
+        // Fallback to default initialization
+        initGame(null);
+    }
 }
 
 // Update game state - called every frame
@@ -137,7 +154,7 @@ export function updateGame(input) {
         const randomX = Math.random() * (GAME_WIDTH - ENEMY_SIZE) + ENEMY_SIZE / 2;
         const randomType = Math.random() < 0.5 ? 'square' : 'x';
         const randomColor = Math.floor(Math.random() * 6) + 1; // Avoid color 0 (white often used for player)
-        spawnEnemy(randomX, -ENEMY_SIZE / 2, randomType, randomColor, 10 + Math.floor(Math.random()*6) );
+        spawnEnemy(randomX, -ENEMY_SIZE / 2, randomType, randomColor, 10 + Math.floor(Math.random() * 6));
     }
 
     if (gameState === 'gameOver') {
@@ -154,7 +171,7 @@ function spawnProjectile(x, y) {
             height: PROJECTILE_LENGTH, // For collision
             active: true,
             color: 6, // Example color (e.g., blue)
-            intensity: 12
+            intensity: 5
         });
     }
 }
@@ -184,7 +201,7 @@ function checkCollisions() {
                 p.x + p.width > e.x - e.width / 2 &&
                 p.y < e.y + e.height / 2 &&
                 p.y + p.height > e.y - e.height / 2) {
-                
+
                 p.active = false;
                 e.active = false; // Enemy is hit
                 player.score += 10; // Increase score
@@ -202,7 +219,7 @@ function checkCollisions() {
             player.x + player.width / 2 > e.x - e.width / 2 && // Assuming player.x is center
             player.y < e.y + e.height / 2 &&
             player.y + player.height / 2 > e.y - e.height / 2) {
-            
+
             e.active = false; // Enemy is removed
             player.lives--;
             // console.log('Player hit! Lives left:', player.lives);
