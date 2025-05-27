@@ -119,7 +119,6 @@ function setupConnectionHandler() {
 
 			if (receivedMetadata.vps && typeof receivedMetadata.vps === 'number' && receivedMetadata.vps > 0) {
 				// Assuming mainLoop runs roughly 50 times per second (setInterval(mainLoop, 20))
-				// const indicativeFrameRate = 50; // No longer defined here, moved to top of function
 
 				const vpsFromMetadata = Math.max(MIN_MAX_OPS, Math.round(receivedMetadata.vps / indicativeFrameRate));
 
