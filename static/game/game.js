@@ -191,16 +191,36 @@ function spawnEnemy(x, y, type, color, intensity) {
 
 function checkCollisions() {
     // Projectile-Enemy collisions
+    let projectileCollisionDebugLogged = false; // Flag to log only for the first P-E pair
+
     projectiles.forEach(p => {
         if (!p.active) return;
         enemies.forEach(e => {
             if (!e.active) return;
 
-            // Simple AABB collision detection
-            if (p.x < e.x + e.width / 2 &&
-                p.x + p.width > e.x - e.width / 2 &&
-                p.y < e.y + e.height / 2 &&
-                p.y + p.height > e.y - e.height / 2) {
+            // AABB collision detection for center-based positioning
+            // Both projectile and enemy coordinates represent their centers
+            const projectileLeft = p.x - p.width / 2;
+            const projectileRight = p.x + p.width / 2;
+            const projectileTop = p.y - p.height / 2;
+            const projectileBottom = p.y + p.height / 2;
+            
+            const enemyLeft = e.x - e.width / 2;
+            const enemyRight = e.x + e.width / 2;
+            const enemyTop = e.y - e.height / 2;
+            const enemyBottom = e.y + e.height / 2;
+
+            if (!projectileCollisionDebugLogged) {
+                console.log(`[CollisionDebug] Projectile (x:${p.x}, y:${p.y}, w:${p.width}, h:${p.height}) -> L:${projectileLeft.toFixed(2)}, R:${projectileRight.toFixed(2)}, T:${projectileTop.toFixed(2)}, B:${projectileBottom.toFixed(2)}`);
+                console.log(`[CollisionDebug] Enemy (x:${e.x}, y:${e.y}, w:${e.width}, h:${e.height}) -> L:${enemyLeft.toFixed(2)}, R:${enemyRight.toFixed(2)}, T:${enemyTop.toFixed(2)}, B:${enemyBottom.toFixed(2)}`);
+                console.log(`[CollisionDebug] Conditions: (pR > eL): ${projectileRight > enemyLeft}, (pL < eR): ${projectileLeft < enemyRight}, (pB > eT): ${projectileBottom > enemyTop}, (pT < eB): ${projectileTop < enemyBottom}`);
+                projectileCollisionDebugLogged = true; // Set flag after logging once per frame
+            }
+
+            if (projectileRight > enemyLeft &&
+                projectileLeft < enemyRight &&
+                projectileBottom > enemyTop &&
+                projectileTop < enemyBottom) {
 
                 p.active = false;
                 e.active = false; // Enemy is hit
@@ -215,10 +235,21 @@ function checkCollisions() {
     enemies.forEach(e => {
         if (!e.active) return;
 
-        if (player.x < e.x + e.width / 2 &&
-            player.x + player.width / 2 > e.x - e.width / 2 && // Assuming player.x is center
-            player.y < e.y + e.height / 2 &&
-            player.y + player.height / 2 > e.y - e.height / 2) {
+        // AABB collision detection for center-based positioning
+        const playerLeft = player.x - player.width / 2;
+        const playerRight = player.x + player.width / 2;
+        const playerTop = player.y - player.height / 2;
+        const playerBottom = player.y + player.height / 2;
+        
+        const enemyLeft = e.x - e.width / 2;
+        const enemyRight = e.x + e.width / 2;
+        const enemyTop = e.y - e.height / 2;
+        const enemyBottom = e.y + e.height / 2;
+
+        if (playerRight > enemyLeft &&
+            playerLeft < enemyRight &&
+            playerBottom > enemyTop &&
+            playerTop < enemyBottom) {
 
             e.active = false; // Enemy is removed
             player.lives--;
