@@ -90,7 +90,7 @@ function gameLoop(currentTime) {
 
     // 4. Send DVG to Monitor
     if (sendDVGToMonitor) {
-        sendDVGToMonitor(dvgCommands.join('\n'), 2000 + dvgCommands.length * 5);
+        sendDVGToMonitor(dvgCommands.join('\n'), dvgCommands.length * 60);
     } else {
         console.warn('sendDVGCommandsFromGameHTML is not available on window. DVG commands not sent.');
     }
