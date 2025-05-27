@@ -106,19 +106,23 @@ function setupConnectionHandler() {
 			parseProgram(); // This function reads from progEditor and updates global 'program'
 
 			// Dynamic maxOps Calculation (after parseProgram)
-			const MAX_POSSIBLE_MAX_OPS = 200;
-			const MIN_MAX_OPS = 1;
+			const MAX_POSSIBLE_MAX_OPS = 500;
+			const MIN_MAX_OPS = 20;
 
 			let maxOpsForProgram = MIN_MAX_OPS;
 			if (program && program.length > 0) { // Use the global 'program' array
-				maxOpsForProgram = Math.max(MIN_MAX_OPS, Math.round(program.length * 0.8));
+				maxOpsForProgram = Math.max(MIN_MAX_OPS, Math.round(program.length * 1.2));
 			}
 
 			let currentOverallMaxOpsSetting = MAX_POSSIBLE_MAX_OPS;
 
 			if (receivedMetadata.vps && typeof receivedMetadata.vps === 'number' && receivedMetadata.vps > 0) {
-				// Assuming mainLoop runs roughly 50 times per second (setInterval(mainLoop, 20ms))
-				const vpsFromMetadata = Math.max(MIN_MAX_OPS, Math.round(receivedMetadata.vps / 50));
+				// Assuming mainLoop runs roughly 50 times per second (setInterval(mainLoop, 20))
+
+				const indicativeFrameRate = 50;
+
+				const vpsFromMetadata = Math.max(MIN_MAX_OPS, Math.round(receivedMetadata.vps / indicativeFrameRate));
+
 				currentOverallMaxOpsSetting = Math.min(vpsFromMetadata, MAX_POSSIBLE_MAX_OPS);
 			}
 
@@ -127,7 +131,7 @@ function setupConnectionHandler() {
 			console.log(`Adjusted maxOps to: ${maxOps} (Program length: ${program ? program.length : 0}, Metadata VPS: ${receivedMetadata.vps || 'N/A'})`);
 			const vpsDisplaySpan = document.getElementById('vps'); // Re-fetch or ensure vps is global
 			if (vpsDisplaySpan) {
-				vpsDisplaySpan.innerHTML = maxOps * 50;
+				vpsDisplaySpan.innerHTML = maxOps * indicativeFrameRate;
 			}
 
 			// Reset Simulation State
