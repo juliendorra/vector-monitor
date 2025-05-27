@@ -1,6 +1,6 @@
 // static/vector.js
 
-import { GAME_WIDTH, GAME_HEIGHT } from './game.js';
+// import { GAME_WIDTH, GAME_HEIGHT } from './game.js'; // Removed as per refactoring
 
 const DVG_SCALE_INDEX_1X = 2; // Assuming scalers[2] is 1.0x
 
@@ -8,12 +8,14 @@ const DVG_SCALE_INDEX_1X = 2; // Assuming scalers[2] is 1.0x
  * Converts game coordinates (top-left origin, Y down) to DVG coordinates (center origin, Y up).
  * @param {number} gameX - Game X coordinate.
  * @param {number} gameY - Game Y coordinate.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
  * @returns {{x: number, y: number}} DVG coordinates.
  */
-function toDVGCoords(gameX, gameY) {
+function toDVGCoords(gameX, gameY, gameWidth, gameHeight) {
     return {
-        x: Math.round(gameX - GAME_WIDTH / 2),
-        y: Math.round(gameY - GAME_HEIGHT / 2) // Y increases downwards from center
+        x: Math.round(gameX - gameWidth / 2),
+        y: Math.round(gameY - gameHeight / 2) // Y increases downwards from center
     };
 }
 
@@ -57,9 +59,11 @@ function color(colorIndex) {
  * @param {number} size - Size of the ship (game units).
  * @param {number} colorIndex - Color index for the ship.
  * @param {number} intensity - Line intensity.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
  * @returns {string[]} Array of DVG commands.
  */
-export function drawPlayer(gameCenterX, gameCenterY, size, colorIndex, intensity) {
+export function drawPlayer(gameCenterX, gameCenterY, size, colorIndex, intensity, gameWidth, gameHeight) {
     const commands = [];
 
     // Game coordinates for the triangle points
@@ -68,9 +72,9 @@ export function drawPlayer(gameCenterX, gameCenterY, size, colorIndex, intensity
     const gameRightBase = { x: gameCenterX + size / 2, y: gameCenterY + size / 3 };
 
     // Convert to DVG coordinates
-    const dvgTip = toDVGCoords(gameTip.x, gameTip.y);
-    const dvgLeftBase = toDVGCoords(gameLeftBase.x, gameLeftBase.y);
-    const dvgRightBase = toDVGCoords(gameRightBase.x, gameRightBase.y);
+    const dvgTip = toDVGCoords(gameTip.x, gameTip.y, gameWidth, gameHeight);
+    const dvgLeftBase = toDVGCoords(gameLeftBase.x, gameLeftBase.y, gameWidth, gameHeight);
+    const dvgRightBase = toDVGCoords(gameRightBase.x, gameRightBase.y, gameWidth, gameHeight);
 
     commands.push(color(colorIndex));
     commands.push(labs(dvgLeftBase.x, dvgLeftBase.y, DVG_SCALE_INDEX_1X));
@@ -88,11 +92,13 @@ export function drawPlayer(gameCenterX, gameCenterY, size, colorIndex, intensity
  * @param {number} length - Length of the projectile line (game units, positive means downwards in game space).
  * @param {number} colorIndex - Color index.
  * @param {number} intensity - Line intensity.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
  * @returns {string[]} Array of DVG commands.
  */
-export function drawProjectile(gameX, gameY, length, colorIndex, intensity) {
+export function drawProjectile(gameX, gameY, length, colorIndex, intensity, gameWidth, gameHeight) {
     const commands = [];
-    const dvgPos = toDVGCoords(gameX, gameY);
+    const dvgPos = toDVGCoords(gameX, gameY, gameWidth, gameHeight);
 
     commands.push(color(colorIndex));
     commands.push(labs(dvgPos.x, dvgPos.y, DVG_SCALE_INDEX_1X));
@@ -109,9 +115,11 @@ export function drawProjectile(gameX, gameY, length, colorIndex, intensity) {
  * @param {number} size - Size of the enemy square (game units).
  * @param {number} colorIndex - Color index.
  * @param {number} intensity - Line intensity.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
  * @returns {string[]} Array of DVG commands.
  */
-export function drawEnemySquare(gameCenterX, gameCenterY, size, colorIndex, intensity) {
+export function drawEnemySquare(gameCenterX, gameCenterY, size, colorIndex, intensity, gameWidth, gameHeight) {
     const commands = [];
     const halfSize = size / 2;
 
@@ -122,10 +130,10 @@ export function drawEnemySquare(gameCenterX, gameCenterY, size, colorIndex, inte
     const gameBL = { x: gameCenterX - halfSize, y: gameCenterY + halfSize }; // Bottom-Left
 
     // Convert to DVG coordinates
-    const dvgTL = toDVGCoords(gameTL.x, gameTL.y);
-    const dvgTR = toDVGCoords(gameTR.x, gameTR.y);
-    const dvgBR = toDVGCoords(gameBR.x, gameBR.y);
-    const dvgBL = toDVGCoords(gameBL.x, gameBL.y);
+    const dvgTL = toDVGCoords(gameTL.x, gameTL.y, gameWidth, gameHeight);
+    const dvgTR = toDVGCoords(gameTR.x, gameTR.y, gameWidth, gameHeight);
+    const dvgBR = toDVGCoords(gameBR.x, gameBR.y, gameWidth, gameHeight);
+    const dvgBL = toDVGCoords(gameBL.x, gameBL.y, gameWidth, gameHeight);
 
     commands.push(color(colorIndex));
     commands.push(labs(dvgTL.x, dvgTL.y, DVG_SCALE_INDEX_1X));
@@ -143,9 +151,11 @@ export function drawEnemySquare(gameCenterX, gameCenterY, size, colorIndex, inte
  * @param {number} size - Size of the enemy (length of one arm of the X from center, game units).
  * @param {number} colorIndex - Color index.
  * @param {number} intensity - Line intensity.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
  * @returns {string[]} Array of DVG commands.
  */
-export function drawEnemyX(gameCenterX, gameCenterY, size, colorIndex, intensity) {
+export function drawEnemyX(gameCenterX, gameCenterY, size, colorIndex, intensity, gameWidth, gameHeight) {
     const commands = [];
     const halfSize = size / 2; // halfSize is used as offset from center to corners of bounding box
 
@@ -158,10 +168,10 @@ export function drawEnemyX(gameCenterX, gameCenterY, size, colorIndex, intensity
     const gameL2End = { x: gameCenterX + halfSize, y: gameCenterY - halfSize };
 
     // Convert to DVG coordinates
-    const dvgL1Start = toDVGCoords(gameL1Start.x, gameL1Start.y);
-    const dvgL1End = toDVGCoords(gameL1End.x, gameL1End.y);
-    const dvgL2Start = toDVGCoords(gameL2Start.x, gameL2Start.y);
-    const dvgL2End = toDVGCoords(gameL2End.x, gameL2End.y);
+    const dvgL1Start = toDVGCoords(gameL1Start.x, gameL1Start.y, gameWidth, gameHeight);
+    const dvgL1End = toDVGCoords(gameL1End.x, gameL1End.y, gameWidth, gameHeight);
+    const dvgL2Start = toDVGCoords(gameL2Start.x, gameL2Start.y, gameWidth, gameHeight);
+    const dvgL2End = toDVGCoords(gameL2End.x, gameL2End.y, gameWidth, gameHeight);
 
     commands.push(color(colorIndex));
     // Draw line 1 (\)
@@ -183,23 +193,25 @@ export function drawEnemyX(gameCenterX, gameCenterY, size, colorIndex, intensity
  * @param {number} spacing - Spacing between hatch lines (game units).
  * @param {number} colorIndex - Color index.
  * @param {number} intensity - Line intensity.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
  * @param {boolean} isVertical - True for vertical lines, false for horizontal.
  * @returns {string[]} Array of DVG commands.
  */
-export function drawHatch(gameX, gameY, width, height, spacing, colorIndex, intensity, isVertical = true) {
+export function drawHatch(gameX, gameY, width, height, spacing, colorIndex, intensity, gameWidth, gameHeight, isVertical = true) {
     const commands = [];
     commands.push(color(colorIndex));
 
     if (isVertical) {
         for (let currentX = gameX; currentX <= gameX + width; currentX += spacing) {
-            const dvgLineStart = toDVGCoords(currentX, gameY);
+            const dvgLineStart = toDVGCoords(currentX, gameY, gameWidth, gameHeight);
             commands.push(labs(dvgLineStart.x, dvgLineStart.y, DVG_SCALE_INDEX_1X));
             // Vertical line of 'height' downwards in game space is 'height' downwards in DVG space (dy = height)
             commands.push(vctr(0, height, 1, intensity));
         }
     } else { // Horizontal
         for (let currentY = gameY; currentY <= gameY + height; currentY += spacing) {
-            const dvgLineStart = toDVGCoords(gameX, currentY);
+            const dvgLineStart = toDVGCoords(gameX, currentY, gameWidth, gameHeight);
             commands.push(labs(dvgLineStart.x, dvgLineStart.y, DVG_SCALE_INDEX_1X));
             // Horizontal line of 'width' rightwards in game space is 'width' rightwards in DVG space
             commands.push(vctr(width, 0, 1, intensity));
@@ -210,11 +222,11 @@ export function drawHatch(gameX, gameY, width, height, spacing, colorIndex, inte
 
 // Placeholder for text drawing - this is complex
 // For now, it draws a small square marker in game space.
-export function drawText(text, gameX, gameY, size, colorIndex, intensity) {
+export function drawText(text, gameX, gameY, size, colorIndex, intensity, gameWidth, gameHeight) {
     const commands = [];
     // Actual text rendering requires a font definition (set of vector paths for each char)
     // For now, let's draw a small square as a placeholder for where text would be.
     // Using drawEnemySquare for this, centered at gameX, gameY.
-    commands.push(...drawEnemySquare(gameX, gameY, size, colorIndex, intensity));
+    commands.push(...drawEnemySquare(gameX, gameY, size, colorIndex, intensity, gameWidth, gameHeight));
     return commands;
 }
