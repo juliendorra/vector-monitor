@@ -96,10 +96,11 @@ function gameLoop(currentTime) {
         }
 
         const lifeMarkerX = game.GAME_WIDTH - 50;
-        const lifeMarkerY = 20;
+        const lifeMarkerY = 50; // Moved down from 20 to 50
         const lifeSize = 15;
+        const lifeSpacing = 25; // Increased spacing from (lifeSize + 5) = 20 to 25
         for (let i = 0; i < lives; i++) {
-            dvgCommands.push(...vector.drawPlayer(lifeMarkerX - i * (lifeSize + 5), lifeMarkerY, lifeSize, playerState.color, playerState.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
+            dvgCommands.push(...vector.drawPlayer(lifeMarkerX - i * lifeSpacing, lifeMarkerY, lifeSize, playerState.color, playerState.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
         }
 
     } else if (currentGameState === 'gameOver') {
