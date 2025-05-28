@@ -92,7 +92,7 @@ var compositeShaderProgram = null;
 // Vector Shader (for quads)
 var vsP0Location, vsP1Location, vsColorIntensityLocation, vsThicknessLocation, vsCornerOffsetLocation;
 var vsStartTimeLocation, vsDrawDurationLocation; // New attributes for timing
-var vsResolutionLocation, vsGlowMultiplierLocation, vsCurrentTimeLocation, vsIntraVectorDecayRateLocation, vsAntialiasPixelWidthLocation, vsQuadExpansionMarginLocation; // Uniforms
+var vsResolutionLocation, vsGlowMultiplierLocation, vsCurrentTimeLocation, vsIntraVectorDecayRateLocation, vsAntialiasPixelWidthLocation, vsQuadExpansionMarginLocation, vsEndpointDwellTimeLocation; // Uniforms
 
 // CombineDecay Shader
 var cdsPosLocation, cdsPreviousStateTexLocation, cdsCurrentLinesTexLocation, cdsGlobalDecayLocation, cdsDifferentialDecayRatesLocation;
@@ -130,6 +130,8 @@ const QUAD_EXPANSION_MARGIN = 3.0; // pixels to expand quad for SDF rendering
 var webGLBeamSpeedSlider = null, webGLBeamSpeedDisplay = null;
 var webGLIntraVectorDecayRateSlider = null, webGLIntraVectorDecayRateDisplay = null;
 var webGLAntialiasPixelWidthSlider = null, webGLAntialiasPixelWidthDisplay = null;
+var webGLEndpointDwellTime = 0.03; // Default dwell time in seconds
+var webGLEndpointDwellTimeSlider = null, webGLEndpointDwellTimeDisplay = null;
 
 
 canvasElement.width = window.innerWidth;
@@ -272,6 +274,7 @@ async function initWebGL() {
 	vsIntraVectorDecayRateLocation = gl.getUniformLocation(vectorShaderProgram, 'uIntraVectorDecayRate');
 	vsAntialiasPixelWidthLocation = gl.getUniformLocation(vectorShaderProgram, 'uAntialiasPixelWidth');
 	vsQuadExpansionMarginLocation = gl.getUniformLocation(vectorShaderProgram, 'uQuadExpansionMargin');
+	vsEndpointDwellTimeLocation = gl.getUniformLocation(vectorShaderProgram, 'uEndpointDwellTime');
 
 	if (vsGlowMultiplierLocation === null || vsGlowMultiplierLocation === -1) {
 		console.error("Failed to get uniform location for uGlowMultiplier.");
@@ -279,8 +282,8 @@ async function initWebGL() {
 	if (vsP0Location === -1 || vsP1Location === -1 || vsColorIntensityLocation === -1 || vsThicknessLocation === -1 || vsCornerOffsetLocation === -1 || vsStartTimeLocation === -1 || vsDrawDurationLocation === -1) {
 		console.error("Failed to get one or more attribute locations for vectorShaderProgram (quads).");
 	}
-	if (vsResolutionLocation === -1 || vsCurrentTimeLocation === -1 || vsIntraVectorDecayRateLocation === -1 || vsAntialiasPixelWidthLocation === -1 || vsQuadExpansionMarginLocation === -1) {
-		console.error("Failed to get one or more uniform locations for new vector shader parameters.");
+	if (vsResolutionLocation === -1 || vsCurrentTimeLocation === -1 || vsIntraVectorDecayRateLocation === -1 || vsAntialiasPixelWidthLocation === -1 || vsQuadExpansionMarginLocation === -1 || vsEndpointDwellTimeLocation === -1) {
+		console.error("Failed to get one or more uniform locations for new vector shader parameters (including uEndpointDwellTime).");
 	}
 
 
@@ -389,6 +392,8 @@ function updateRendererToggleButton() {
 		if (webGLIntraVectorDecayRateSlider) webGLIntraVectorDecayRateSlider.value = webGLIntraVectorDecayRate.toFixed(2);
 		if (webGLAntialiasPixelWidthDisplay) webGLAntialiasPixelWidthDisplay.textContent = webGLAntialiasPixelWidth.toFixed(2);
 		if (webGLAntialiasPixelWidthSlider) webGLAntialiasPixelWidthSlider.value = webGLAntialiasPixelWidth.toFixed(2);
+		if (webGLEndpointDwellTimeDisplay) webGLEndpointDwellTimeDisplay.textContent = webGLEndpointDwellTime.toFixed(3);
+		if (webGLEndpointDwellTimeSlider) webGLEndpointDwellTimeSlider.value = webGLEndpointDwellTime.toFixed(3);
 
 
 	} else {
@@ -532,6 +537,11 @@ function setupConnectionHandler() {
 					webGLAntialiasPixelWidth = Math.max(0.1, Math.min(5.0, receivedMetadata.webGLAntialiasPixelWidth));
 					if (webGLAntialiasPixelWidthSlider) webGLAntialiasPixelWidthSlider.value = webGLAntialiasPixelWidth.toFixed(2);
 					if (webGLAntialiasPixelWidthDisplay) webGLAntialiasPixelWidthDisplay.textContent = webGLAntialiasPixelWidth.toFixed(2);
+				}
+				if (receivedMetadata.hasOwnProperty('webGLEndpointDwellTime') && typeof receivedMetadata.webGLEndpointDwellTime === 'number') {
+					webGLEndpointDwellTime = Math.max(0.0, Math.min(0.5, receivedMetadata.webGLEndpointDwellTime)); // Max 0.5s dwell
+					if (webGLEndpointDwellTimeSlider) webGLEndpointDwellTimeSlider.value = webGLEndpointDwellTime.toFixed(3);
+					if (webGLEndpointDwellTimeDisplay) webGLEndpointDwellTimeDisplay.textContent = webGLEndpointDwellTime.toFixed(3);
 				}
 			}
 
@@ -819,6 +829,7 @@ function renderWebGLFrame() {
 			gl.uniform1f(vsIntraVectorDecayRateLocation, webGLIntraVectorDecayRate);
 			gl.uniform1f(vsAntialiasPixelWidthLocation, webGLAntialiasPixelWidth);
 			gl.uniform1f(vsQuadExpansionMarginLocation, QUAD_EXPANSION_MARGIN);
+			gl.uniform1f(vsEndpointDwellTimeLocation, webGLEndpointDwellTime);
 
 			gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 13); // 13 components per vertex
 		}
@@ -1146,6 +1157,16 @@ window.addEventListener("load", async () => {
 		webGLAntialiasPixelWidthSlider.addEventListener('input', (e) => {
 			webGLAntialiasPixelWidth = parseFloat(e.target.value);
 			if (webGLAntialiasPixelWidthDisplay) webGLAntialiasPixelWidthDisplay.textContent = webGLAntialiasPixelWidth.toFixed(2);
+		});
+	}
+
+	webGLEndpointDwellTimeSlider = document.getElementById("webGLEndpointDwellTimeSlider");
+	webGLEndpointDwellTimeDisplay = document.getElementById("webGLEndpointDwellTimeValue");
+	if (webGLEndpointDwellTimeSlider) {
+		webGLEndpointDwellTimeSlider.value = webGLEndpointDwellTime.toFixed(3);
+		webGLEndpointDwellTimeSlider.addEventListener('input', (e) => {
+			webGLEndpointDwellTime = parseFloat(e.target.value);
+			if (webGLEndpointDwellTimeDisplay) webGLEndpointDwellTimeDisplay.textContent = webGLEndpointDwellTime.toFixed(3);
 		});
 	}
 

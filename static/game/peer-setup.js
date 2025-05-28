@@ -77,6 +77,16 @@ function sendDVGCommands(dvgString, vps = 200) {
             dvgProgramText: dvgString,
             metadata: {
                 // vps: vps // let the monitor adjust the ops per seconds
+                webGLGlowMultiplier: 1.3,
+                webGLLineWidthMultiplier: 1.0,
+                webGLDifferentialDecayRates: {
+                    r: 2.6,
+                    g: 2.7,
+                    b: 3.7
+                },
+                webGLBeamSpeed: 10000,
+                webGLIntraVectorDecayRate: 8.9,
+                webGLAntialiasPixelWidth: 1.5
             }
         };
         gameConnection.send(payload);

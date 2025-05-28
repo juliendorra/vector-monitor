@@ -12,6 +12,7 @@ uniform vec2 uResolution;
 uniform float uPassEvaluationTime;     // Time at which the pass's state is evaluated
 uniform float uIntraVectorDecayRate;   // Decay rate for intra-vector fading
 uniform float uAntialiasPixelWidth;    // Pixel width for SDF anti-aliasing
+uniform float uEndpointDwellTime;      // Additional time endpoints appear to stay bright (e.g., 0.05 seconds)
 
 // SDF for a line segment with rounded caps
 // p: current point (fragment coordinate)
@@ -70,6 +71,8 @@ void main(void) {
   if (vDrawDuration_FS <= 0.00001) { // Instantaneous vector (e.g., a point or zero duration line)
       // Its "age" is how long ago it appeared (time_since_vector_birth).
       float age = time_since_vector_birth;
+      // Apply dwell time to points as well, making them linger longer.
+      age = max(0.0, age - uEndpointDwellTime);
       temporal_decay_factor = exp(-age * uIntraVectorDecayRate);
   } else { // Vector has a draw duration, simulate beam travel
       // Calculate the time offset from the start of this vector's drawing
@@ -86,6 +89,17 @@ void main(void) {
       // If we are here, the beam has passed or is at this fragment by uPassEvaluationTime.
       // The "age" of this specific fragment's illumination is how long ago it was lit.
       float frag_illumination_age = time_since_vector_birth - time_beam_reaches_frag_offset;
+
+      // Endpoint dwell effect:
+      // Calculate proximity to endpoints. Factor is 1.0 at endpoints, 0.0 in the middle.
+      // Effect is concentrated in the first 10% and last 10% of the vector's length.
+      float endpoint_prox_start = 1.0 - smoothstep(0.0, 0.1, frag_progress_along_line);
+      float endpoint_prox_end = smoothstep(0.9, 1.0, frag_progress_along_line);
+      float at_endpoint_factor = max(endpoint_prox_start, endpoint_prox_end);
+
+      // Reduce effective age at endpoints to make them linger (decay slower)
+      frag_illumination_age = max(0.0, frag_illumination_age - at_endpoint_factor * uEndpointDwellTime);
+      
       temporal_decay_factor = exp(-frag_illumination_age * uIntraVectorDecayRate);
   }
   

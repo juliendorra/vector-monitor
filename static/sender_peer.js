@@ -50,6 +50,8 @@ window.addEventListener('load', () => {
     const webGLIntraVectorDecayRateValueSpan = document.getElementById('webGLIntraVectorDecayRateValue');
     const webGLAntialiasPixelWidthSlider = document.getElementById('webGLAntialiasPixelWidth');
     const webGLAntialiasPixelWidthValueSpan = document.getElementById('webGLAntialiasPixelWidthValue');
+    const webGLEndpointDwellTimeSlider = document.getElementById('webGLEndpointDwellTime');
+    const webGLEndpointDwellTimeValueSpan = document.getElementById('webGLEndpointDwellTimeValue');
 
     let peer = null;
     let currentConnection = null;
@@ -337,6 +339,7 @@ JMPL START
     setupSliderWithValueDisplay(webGLBeamSpeedSlider, webGLBeamSpeedValueSpan, 0);
     setupSliderWithValueDisplay(webGLIntraVectorDecayRateSlider, webGLIntraVectorDecayRateValueSpan, 2);
     setupSliderWithValueDisplay(webGLAntialiasPixelWidthSlider, webGLAntialiasPixelWidthValueSpan, 2);
+    setupSliderWithValueDisplay(webGLEndpointDwellTimeSlider, webGLEndpointDwellTimeValueSpan, 3);
 
 
     function initializeSenderPeer() { /* ... existing peer init logic ... */
@@ -401,6 +404,7 @@ JMPL START
         if (webGLBeamSpeedSlider) payload.metadata.webGLBeamSpeed = parseFloat(webGLBeamSpeedSlider.value);
         if (webGLIntraVectorDecayRateSlider) payload.metadata.webGLIntraVectorDecayRate = parseFloat(webGLIntraVectorDecayRateSlider.value);
         if (webGLAntialiasPixelWidthSlider) payload.metadata.webGLAntialiasPixelWidth = parseFloat(webGLAntialiasPixelWidthSlider.value);
+        if (webGLEndpointDwellTimeSlider) payload.metadata.webGLEndpointDwellTime = parseFloat(webGLEndpointDwellTimeSlider.value);
 
         senderStatusDiv.textContent = `Status: Attempting to connect to ${targetPeerId}...`;
         if (currentConnection) currentConnection.close();
