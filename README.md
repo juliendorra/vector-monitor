@@ -1,4 +1,4 @@
-# Web DVG CRT Vector Monitor
+# The Web Vector Monitor
 
 Try it here: https://vector-monitor.deno.dev/sender_peer.html 
 
@@ -8,33 +8,37 @@ The commands are based on the ones in the Atari's Digital Vector Generator, used
 
 It's important to understand that this monitor emulates a *programmable display*. Rather than just rendering static images, applications send a sequence of commands—a program—that the monitor's vector generator interprets. This program can include control flow instructions like jumps and subroutine calls, enabling dynamic and persistent visuals.
 
-It's based on the [Atari Digital Vector Generator Simulator](https://laemeur.sdf.org/dvgsim/) by Adam Moore, with COLOR, CENTER and SCALE commands added.
+It's originally based on the [Atari Digital Vector Generator Simulator](https://laemeur.sdf.org/dvgsim/) by Adam Moore.
+
+I added the COLOR, CENTER and SCALE commands, a brand new webGL renderer with intra-vector decay with color differential decay to get closer to phosphor decay, and of course the a webRTC endpoint that receive the vector commands and render them in realtime.
+
+An example game using the monitor as a virtual peripheral can be played at https://vector-monitor.deno.dev/game
 
 ## Architecture
 
 The system consists of two main parts:
 
-1.  **The DVG Monitor (`static/monitor_display.html`):** This is the client-side application that emulates the vector display. It initializes a PeerJS client, obtains a unique PeerJS ID (typically provided via URL parameter), and listens for incoming data connections. When it receives DVG (Digital Vector Generator) commands (a program), it renders them on an HTML canvas.
+1.  **The DVG Monitor (`static/monitor_display.html`):** This is the client-side application that emulates the vector display. It acts as a web peripheral. It initializes a PeerJS client, obtains a unique PeerJS ID (typically provided via URL parameter), and listens for incoming data connections. When it receives DVG (Digital Vector Generator) commands (a program), it renders them on an HTML canvas.
 2.  **The Sender Application (example: `static/sender_peer.html`):** This is an example web application that also uses PeerJS. It allows users to write or load DVG assembly programs, connect to a specified DVG Monitor's PeerJS ID, and send the programs for execution. It includes features like PeerJS ID generation for monitors, local storage for target IDs, a CodeMirror editor with DVG syntax highlighting, and example scripts.
 
 The server component (`main.ts`) is a simple Deno static file server responsible only for serving the HTML, JavaScript, and CSS files. All real-time communication is handled directly between the sender and the monitor clients via PeerJS, using the public PeerJS server for signaling by default.
 
 ## Features
 
-*   Real-time vector drawing on an HTML canvas.
+*   Real-time vector drawing on an HTML canvas. WebGL (default) and Canvas 2D (legacy) implementations
 *   PeerJS integration for P2P communication.
-*   Sender UI with:
+*   Sender UI example with:
     *   NanoID generation for unique monitor PeerJS IDs.
     *   Button to directly open a configured monitor window.
     *   Local browser storage for remembering the last used Target Monitor Peer ID.
     *   CodeMirror editor for DVG assembly input with custom syntax highlighting.
     *   Cmd/Ctrl+Enter shortcut to send programs from the editor.
     *   A selector for loading example DVG scripts.
-    *   Option to suggest a "Desired Display VPS" (Vectors Per Second) to the monitor.
+    *   Optionnal settings for the monitor.
 *   Monitor displays received DVG program code in its own UI.
 *   Monitor dynamically adjusts drawing speed (`maxOps`) based on program length and received VPS metadata to improve CRT effect for varying program sizes.
-*   Simulated phosphor glow and decay effects.
-*   Support for programmatic DVG commands including loops and subroutines for persistent/dynamic displays.
+*   Simulated phosphor glow and decay effects, including dwell time at the end of the vector.
+*   Support for programmatic DVG commands including loops and subroutines for persistent/dynamic displays without resending the same code over and over.
 
 ## Getting Started
 
@@ -87,7 +91,7 @@ The server component (`main.ts`) is a simple Deno static file server responsible
 1.  **Using the Sender Page (`sender_peer.html`):**
     *   Ensure the "Target Monitor Peer ID" field is populated with the ID of the DVG Monitor window you opened (this should be automatic if you used the "Generate ID" and "Open Monitor" buttons).
     *   The "DVG Assembly Program Text:" CodeMirror editor area will be pre-filled with an example DVG assembly program (a looping square). You can select other examples from the "Load Example Program:" dropdown, or write/paste your own DVG assembly. (See "DVG Command Reference" below).
-    *   (Optional) You can specify a "Desired Display VPS" to influence the monitor's drawing speed.
+    *   (Optional) You can specify setting to influence the monitor's drawing speed, glow, dwelling time, etc.
     *   Click the "Connect & Send Commands" button (or use Cmd/Ctrl+Enter shortcut from the editor).
 
 2.  **On the DVG Monitor Page (`monitor_display.html`):**
