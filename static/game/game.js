@@ -271,15 +271,16 @@ function spawnExplosion(enemy) {
         const halfW = enemy.width / 2;
         const halfH = enemy.height / 2;
         const outwardSpeed = FRAGMENT_BASE_SPEED * 0.6;
+        const rotationSpeed = FRAGMENT_ROTATION_SPEED * (Math.random() > 0.5 ? 1 : -1);
 
         // Top edge
-        newExplosion.fragments.push(createFragment(enemy.x, enemy.y - halfH, 0, -outwardSpeed, enemy.width, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, 0));
+        newExplosion.fragments.push(createFragment(enemy.x, enemy.y - halfH, 0, -outwardSpeed, enemy.width, rotationSpeed, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, false, 0));
         // Bottom edge
-        newExplosion.fragments.push(createFragment(enemy.x, enemy.y + halfH, 0, outwardSpeed, enemy.width, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, 0));
+        newExplosion.fragments.push(createFragment(enemy.x, enemy.y + halfH, 0, outwardSpeed, enemy.width, rotationSpeed, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, false, 0));
         // Left edge
-        newExplosion.fragments.push(createFragment(enemy.x - halfW, enemy.y, -outwardSpeed, 0, enemy.height, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, Math.PI / 2));
+        newExplosion.fragments.push(createFragment(enemy.x - halfW, enemy.y, -outwardSpeed, 0, enemy.height, rotationSpeed, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, false, Math.PI / 2));
         // Right edge
-        newExplosion.fragments.push(createFragment(enemy.x + halfW, enemy.y, outwardSpeed, 0, enemy.height, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, Math.PI / 2));
+        newExplosion.fragments.push(createFragment(enemy.x + halfW, enemy.y, outwardSpeed, 0, enemy.height, rotationSpeed, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, false, Math.PI / 2));
     } else if (enemy.type === 'x') {
         const lineLength = enemy.width * Math.sqrt(2); // enemy.width is the size of the bounding box for X
 
