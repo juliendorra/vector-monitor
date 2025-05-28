@@ -126,33 +126,39 @@
     var lastX = 0;
     var lastY = 0;
     var heldItem;
-    var toolBox = document.getElementById('controlBox');
+    var toolBox; // Declare toolBox; will be initialized on load
 
     function mouseMove(evt) {
+      // Fallback initialization for toolBox, though it should be set by initializeUI.
+      if (!toolBox) {
+        toolBox = document.getElementById('controlBox');
+        if (!toolBox) return; // If still not found, exit to prevent error.
+      }
+
       lastX = thisX;
       lastY = thisY;
       thisX = evt.clientX;
       thisY = evt.clientY;
       if (evt.buttons == 1 && heldItem) {
-        var rect = heldItem.getClientRects()[0];
+        var rect = heldItem.getClientRects()[0]; // Added var for local scope
         heldItem.style.left = (rect.left + (thisX - lastX)) + "px";
         heldItem.style.top = (rect.top + (thisY - lastY)) + "px";
       }
       if (evt.buttons == 1) {
         // Make sure the command palette hasn't disappeared, which it sometimes
         // does when being dragged.
-        tbRects = toolBox.getClientRects()[0];
+        var tbRects = toolBox.getClientRects()[0]; // Added var for local scope
         if ((tbRects.right < 0) || (tbRects.left > window.innerWidth) ||
           (tbRects.bottom < 0) || (tbRects.top > window.innerHeight)) {
-          toolBox.style.left = evt.clientX;
-          toolBox.style.top = evt.clientY;
+          toolBox.style.left = evt.clientX + "px"; // Fixed: Added "px" for CSS units
+          toolBox.style.top = evt.clientY + "px";  // Fixed: Added "px" for CSS units
         }
       }
     }
-    function toggle(target, button, texts) {
 
-      target = document.getElementById(target);
-      button = document.getElementById(button);
+    function toggle(target, button, texts) {
+      target = document.getElementById(target); // Parameter reassignment is fine
+      button = document.getElementById(button); // Parameter reassignment is fine
 
       if (target.style.display && target.style.display == "block") {
         target.style.display = "none"
@@ -162,24 +168,27 @@
         button.innerHTML = texts.opened;
       }
     }
+
     function dragElement(event) {
-      target = event.target;
+      var target = event.target; // Added var for local scope
       event.preventDefault();
       event.stopPropagation();
       if (event.buttons == 1) {
-        rect = target.getClientRects()[0];
+        var rect = target.getClientRects()[0]; // Added var for local scope
         target.style.left = (rect.left + (event.clientX - lastX)) + "px";
         target.style.top = (rect.top + (event.clientY - lastY)) + "px";
       }
     }
+
     function holdMe(e) {
       heldItem = e.target;
     }
+
     function dropMe(e) {
       heldItem = false;
     }
 
-    exampleCode =
+    var exampleCode = // Added var for global declaration
       `LABEL START ; This is the beginning of the program
 
 LABS -511 0 2 
@@ -270,13 +279,20 @@ VCTR 2 -2 1 8
 COLOR 0
 RTSL`  ;
 
-    function setCodeExample() {
-      document.getElementById("progEditor").value = exampleCode;
+    function initializeUI() {
+      toolBox = document.getElementById('controlBox');
+      var progEditor = document.getElementById("progEditor");
+      if (progEditor) { // Check if progEditor exists before setting its value
+        progEditor.value = exampleCode;
+      }
+
+      // Attach listeners that depend on DOM elements being ready
+      window.addEventListener("mousemove", mouseMove, true);
+      window.addEventListener("mouseup", dropMe, true);
     }
 
-    window.addEventListener("mousemove", mouseMove, true);
-    window.addEventListener("mouseup", dropMe, true);
-    window.addEventListener("load", setCodeExample, true);
+    // Call initializeUI on load
+    window.addEventListener("load", initializeUI, true);
   </script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <script>
@@ -291,10 +307,39 @@ RTSL`  ;
       // The 'id' for monitorId (WebSocket) is no longer used here.
     });
   </script>
+  <style>
+    #webglCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0; /* Ensure it's behind other UI if necessary */
+    }
+    #phosphor {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0; /* Ensure it's behind other UI if necessary */
+      background-color: black; /* Ensure black background */
+    }
+    #webglCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0; /* Ensure it's behind other UI if necessary */
+      background-color: black; /* Ensure black background if not cleared by WebGL */
+    }
+  </style>
 </head>
 
 <body>
-  <canvas id="phosphor">This page relies on the Canvas element of HTML5.</canvas>
+  <canvas id="phosphor">This page relies on the Canvas element of HTML5 (2D Fallback).</canvas>
+  <canvas id="webglCanvas">This page requires WebGL support.</canvas>
 
   <!-- ======================================================== -->
   <div class="windowdiv" id="controlBox" onmousedown="holdMe(event);">
@@ -302,16 +347,28 @@ RTSL`  ;
     <div class="toggler" id="toolToggler" onclick="toggle('toolDrawer', 'toolToggler', {opened:'Close Tools', closed:'Open Tools'} );">Open Tools</div>
     <div id="toolDrawer">
       <div id="controls">
-        Vectors Per Second: <span id="vps">200</span> ( Ctrl + [<kbd>&lt;</kbd>] / [<kbd>&gt;</kbd>] to change )<br>
-        Phosphor Decay: <span id="decay">-5%/ms</span> ( Ctrl + [<kbd>[</kbd>] / [<kbd>]</kbd>] to change )
+        Vectors Per Second: <span id="vps">200</span> ( Ctrl + [<kbd><</kbd>] / [<kbd>></kbd>] to change )<br>
+        Phosphor Decay: <span id="decay">-15%/frame</span> ( Ctrl + [<kbd>[</kbd>] / [<kbd>]</kbd>] to change )<br>
+        <button id="rendererToggler" onclick="toggleRenderer()">Toggle Renderer (Current: 2D)</button><br>
+        <div id="webglSettings" style="display: none;">
+          WebGL Glow Multiplier: <input type="range" id="webGLGlowMultiplierSlider" min="0.0" max="5.0" step="0.1" value="1.0"> <span id="webGLGlowValue">1.00</span> (Ctrl+[<kbd>PgUp</kbd>]/[<kbd>PgDn</kbd>])<br>
+          WebGL Line Width Multiplier: <input type="range" id="webGLLineWidthMultiplierSlider" min="0.1" max="10.0" step="0.1" value="1.0"> <span id="webGLLineWidthValue">1.00</span> (Ctrl+Alt+[<kbd>PgUp</kbd>]/[<kbd>PgDn</kbd>])<br>
+          Differential Decay Rates (Ctrl + Shift + Keys):<br>
+          Red: <input type="range" id="redDecayRate" min="0.1" max="5" step="0.1" value="0.5"> <span id="redDecayValue">0.5</span> (R/F)<br>
+          Green: <input type="range" id="greenDecayRate" min="0.1" max="5" step="0.1" value="1.0"> <span id="greenDecayValue">1.0</span> (G/H)<br>
+          Blue: <input type="range" id="blueDecayRate" min="0.1" max="5" step="0.1" value="2.5"> <span id="blueDecayValue">2.5</span> (B/N)<br>
+          <hr>
+          Beam Speed (px/sec): <input type="range" id="webGLBeamSpeedSlider" min="100" max="10000" step="100" value="1000"> <span id="webGLBeamSpeedValue">1000</span><br>
+          Intra-Vector Decay: <input type="range" id="webGLIntraVectorDecayRateSlider" min="0.0" max="50.0" step="0.1" value="5.0"> <span id="webGLIntraVectorDecayRateValue">5.00</span><br>
+          Antialias Width (px): <input type="range" id="webGLAntialiasPixelWidthSlider" min="0.1" max="5.0" step="0.1" value="1.5"> <span id="webGLAntialiasPixelWidthValue">1.50</span><br>
+        </div>
       </div>
       <div><b>Program</b> <small>( Ctrl + Enter to assemble & run )</small></div>
       <textarea id="progEditor" spellcheck="false"></textarea>
-      <div>
-        <!-- dvgsim.js is loaded here, after window.monitorId should be set -->
-        <script src="dvgsim.js"></script>
     </div>
   </div>
+  <!-- dvgsim.js is loaded here, after canvas elements are defined -->
+  <script src="dvgsim.js"></script>
 </body>
 
 </html>
