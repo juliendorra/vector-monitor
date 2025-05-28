@@ -335,7 +335,7 @@ function updateExplosions() {
             frag.lifetime--;
 
             if (!frag.isBoxSide) { // Box sides maintain length, others shrink
-                 frag.currentLength = frag.initialLength * Math.max(0, (frag.lifetime / EXPLOSION_LIFETIME));
+                frag.currentLength = frag.initialLength * Math.max(0, (frag.lifetime / EXPLOSION_LIFETIME));
             }
             frag.currentIntensity = Math.max(1, Math.round(frag.initialIntensity * (frag.lifetime / EXPLOSION_LIFETIME)));
 
@@ -366,7 +366,7 @@ function checkCollisions() {
             const projectileRight = p.x + p.width / 2;
             const projectileTop = p.y - p.height / 2;
             const projectileBottom = p.y + p.height / 2;
-            
+
             const enemyLeft = e.x - e.width / 2;
             const enemyRight = e.x + e.width / 2;
             const enemyTop = e.y - e.height / 2;
@@ -403,7 +403,7 @@ function checkCollisions() {
         const playerRight = player.x + player.width / 2;
         const playerTop = player.y - player.height / 2;
         const playerBottom = player.y + player.height / 2;
-        
+
         const enemyLeft = e.x - e.width / 2;
         const enemyRight = e.x + e.width / 2;
         const enemyTop = e.y - e.height / 2;
@@ -414,7 +414,8 @@ function checkCollisions() {
             playerBottom > enemyTop &&
             playerTop < enemyBottom) {
 
-            e.active = false; // Enemy is removed
+            // e.active = false; // Enemy is hit - Replaced by spawnExplosion
+            spawnExplosion(e); // Spawn explosion
             player.lives--;
             // console.log('Player hit! Lives left:', player.lives);
             if (player.lives <= 0) {
@@ -455,7 +456,7 @@ export function getExplosionsState() {
     explosions.forEach(exp => {
         exp.fragments.forEach(frag => {
             // Make sure to pass a copy of the fragment for rendering
-            activeFragments.push({...frag});
+            activeFragments.push({ ...frag });
         });
     });
     return activeFragments;
