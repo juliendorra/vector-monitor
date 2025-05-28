@@ -11,9 +11,14 @@ var vectorShaderProgram = null;
 var combineDecayShaderProgram = null; // Renamed from decayShaderProgram
 var compositeShaderProgram = null;
 
-var vsPosLocation, vsColorLocation, vsResolutionLocation, vsGlowMultiplierLocation; // Vector Shader
-var cdsPosLocation, cdsPreviousStateTexLocation, cdsCurrentLinesTexLocation, cdsGlobalDecayLocation, cdsDifferentialDecayRatesLocation; // CombineDecay Shader
-var csPosLocation, csCompositeTextureLocation; // Composite Shader
+// Vector Shader (for quads)
+var vsP0Location, vsP1Location, vsColorIntensityLocation, vsThicknessLocation, vsCornerOffsetLocation;
+var vsResolutionLocation, vsGlowMultiplierLocation; // Uniforms
+
+// CombineDecay Shader
+var cdsPosLocation, cdsPreviousStateTexLocation, cdsCurrentLinesTexLocation, cdsGlobalDecayLocation, cdsDifferentialDecayRatesLocation;
+// Composite Shader
+var csPosLocation, csCompositeTextureLocation;
 
 // WebGL Buffers
 var lineVertexBuffer = null;
@@ -27,6 +32,12 @@ var currentStateIndex = 0; // Used to ping-pong between state textures
 // WebGL specific settings
 var webGLGlowMultiplier = 1.0;
 var webGLGlowDisplay = null;
+var webGLGlowMultiplierSlider = null; // Added for the slider element
+var webGLLineWidthMultiplier = 1.0;
+var webGLLineWidthDisplay = null;
+var webGLLineWidthMultiplierSlider = null;
+var maxGlLineWidthRange = [1, 1]; // Stores min/max supported line width
+
 var webGLDifferentialDecayRates = { r: 0.5, g: 1.0, b: 2.5 };
 var webGLRedDecayRateSlider = null, webGLGreenDecayRateSlider = null, webGLBlueDecayRateSlider = null;
 var webGLRedDecayValueDisplay = null, webGLGreenDecayValueDisplay = null, webGLBlueDecayValueDisplay = null;
@@ -157,11 +168,22 @@ async function initWebGL() {
 		return false;
 	}
 
-	// Vector Shader Locations
-	vsPosLocation = gl.getAttribLocation(vectorShaderProgram, 'aVertexPosition');
-	vsColorLocation = gl.getAttribLocation(vectorShaderProgram, 'aVertexColor');
+	// Vector Shader Locations (for quads)
+	vsP0Location = gl.getAttribLocation(vectorShaderProgram, 'aP0');
+	vsP1Location = gl.getAttribLocation(vectorShaderProgram, 'aP1');
+	vsColorIntensityLocation = gl.getAttribLocation(vectorShaderProgram, 'aColorIntensity');
+	vsThicknessLocation = gl.getAttribLocation(vectorShaderProgram, 'aThickness');
+	vsCornerOffsetLocation = gl.getAttribLocation(vectorShaderProgram, 'aCornerOffset');
+	
 	vsResolutionLocation = gl.getUniformLocation(vectorShaderProgram, 'uResolution');
 	vsGlowMultiplierLocation = gl.getUniformLocation(vectorShaderProgram, 'uGlowMultiplier');
+	if (vsGlowMultiplierLocation === null || vsGlowMultiplierLocation === -1) {
+		console.error("Failed to get uniform location for uGlowMultiplier.");
+	}
+	if (vsP0Location === -1 || vsP1Location === -1 || vsColorIntensityLocation === -1 || vsThicknessLocation === -1 || vsCornerOffsetLocation === -1) {
+		console.error("Failed to get one or more attribute locations for vectorShaderProgram (quads).");
+	}
+
 
 	// CombineDecay Shader Locations
 	cdsPosLocation = gl.getAttribLocation(combineDecayShaderProgram, 'aPosition');
@@ -203,8 +225,39 @@ async function initWebGL() {
 	const canvasWidth = gl.canvas.width;
 	const canvasHeight = gl.canvas.height;
 
-	lineTexture = createTexture(canvasWidth, canvasHeight);
+	// Attempt to use float texture for lineTexture for better glow accumulation
+	let lineTexInternalFormat = gl.RGBA;
+	let lineTexType = gl.UNSIGNED_BYTE;
+	const isWebGL2 = !!gl.texStorage2D; // A WebGL2 function
+
+	if (isWebGL2) {
+		lineTexInternalFormat = gl.RGBA16F; // Or RGBA32F for higher precision
+		lineTexType = gl.FLOAT;
+		console.log("Using WebGL2 float texture for lines (RGBA16F).");
+	} else {
+		const floatTextureExt = gl.getExtension('OES_texture_float');
+		const floatTextureLinearExt = gl.getExtension('OES_texture_float_linear');
+		if (floatTextureExt && floatTextureLinearExt) {
+			lineTexType = gl.FLOAT;
+			// Internal format remains gl.RGBA for WebGL1 with OES_texture_float
+			console.log("Using WebGL1 OES_texture_float for lines.");
+		} else {
+			console.log("Float textures not supported for lines, using UNSIGNED_BYTE.");
+		}
+	}
+	
+	lineTexture = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, lineTexture);
+	gl.texImage2D(gl.TEXTURE_2D, 0, lineTexInternalFormat, canvasWidth, canvasHeight, 0, gl.RGBA, lineTexType, null);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	lineFBO = createFBO(lineTexture);
+
+	maxGlLineWidthRange = gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE);
+	console.log("Supported line width range: ", maxGlLineWidthRange[0], "to", maxGlLineWidthRange[1]);
+
 
 	stateTextures[0] = createTexture(canvasWidth, canvasHeight);
 	stateFBOs[0] = createFBO(stateTextures[0]);
@@ -237,6 +290,9 @@ function updateRendererToggleButton() {
 		canvasElement.style.display = 'none';
 		if (webGLSettingsElement) webGLSettingsElement.style.display = 'block';
 		if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
+		if (webGLGlowMultiplierSlider) webGLGlowMultiplierSlider.value = webGLGlowMultiplier.toFixed(2);
+		if (webGLLineWidthDisplay) webGLLineWidthDisplay.innerHTML = webGLLineWidthMultiplier.toFixed(2);
+		if (webGLLineWidthMultiplierSlider) webGLLineWidthMultiplierSlider.value = webGLLineWidthMultiplier.toFixed(2);
 
 	} else {
 		webGLCanvasElement.style.display = 'none';
@@ -393,7 +449,7 @@ function render2DFrame() {
 			lastPoint.x += relX; lastPoint.y += relY; DVG.lineTo(lastPoint.x, lastPoint.y);
 		}
 		else if (thisOp.opcode == "SVEC") {
-			var relX = thisOp.x << (4 + thisOp.scale); var relY = thisOp.y << (4 + this.scale);
+			var relX = thisOp.x << (4 + thisOp.scale); var relY = thisOp.y << (4 + thisOp.scale);
 			if (thisOp.intensity != lastIntensity) {
 				glowStroke2D(); lastIntensity = thisOp.intensity;
 				DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y);
@@ -452,6 +508,7 @@ function renderWebGLFrame() {
 	gl.useProgram(vectorShaderProgram);
 	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Additive blending for lines
+	// Note: gl.lineWidth(1.0) is the default. We'll set it per pass.
 
 	let vertices = [];
 	// let currentProgram = [...program]; // Operate on a copy for this frame if pc can change
@@ -466,7 +523,7 @@ function renderWebGLFrame() {
 	const originalFramePC = pc;
 	const originalFrameSCALE_FACTOR = SCALE_FACTOR;
 	const originalFrameCOLOR = COLOR;
-	const originalFrameLastIntensity = lastIntensity;
+	const originalFrameLastIntensity = lastIntensity; // Save this for consistent state reset
 
 
 	const glowPasses = [
@@ -522,16 +579,28 @@ function renderWebGLFrame() {
 				let x1 = lastPoint.x;
 				let y1 = lastPoint.y;
 
-				vertices.push(x0, y0, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity);
-				vertices.push(x1, y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity);
+				let currentThickness = pass.widthArray[lastIntensity] * webGLLineWidthMultiplier;
+				// Ensure minimum thickness for visibility, especially for zero-intensity lines if they are to be subtly visible
+				currentThickness = Math.max(0.5, currentThickness); // Minimum 0.5 pixel thickness
+
+				// Triangle 1: (P0, sideA), (P1, sideA), (P0, sideB)
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0, -1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
+				// Triangle 2: (P1, sideA), (P1, sideB), (P0, sideB)
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0,  1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
 			}
 			else if (thisOp.opcode == "SVEC") {
 				var relX = thisOp.x << (4 + thisOp.scale);
-				var relY = thisOp.y << (4 + thisOp.scale);
+				var relY = thisOp.y << (4 + thisOp.scale); // Note: original code had `this.scale` here, likely a typo for `thisOp.scale`
 				if (thisOp.intensity != lastIntensity) {
 					lastIntensity = thisOp.intensity;
 				}
 				opIntensity = pass.brightArray[lastIntensity];
+				let currentThickness = pass.widthArray[lastIntensity] * webGLLineWidthMultiplier;
+				currentThickness = Math.max(0.5, currentThickness);
 
 				let x0 = lastPoint.x;
 				let y0 = lastPoint.y;
@@ -539,8 +608,15 @@ function renderWebGLFrame() {
 				lastPoint.y += relY;
 				let x1 = lastPoint.x;
 				let y1 = lastPoint.y;
-				vertices.push(x0, y0, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity);
-				vertices.push(x1, y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity);
+
+				// Triangle 1
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0, -1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
+				// Triangle 2
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0,  1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
 			} else if (thisOp.opcode == "JMPL") {
 				if (typeof thisOp.target !== 'number' || thisOp.target < 0 || thisOp.target >= program.length) { HALT_FLAG = 1; break; }
 				pc = thisOp.target; continue;
@@ -558,14 +634,30 @@ function renderWebGLFrame() {
 		if (vertices.length > 0) {
 			gl.bindBuffer(gl.ARRAY_BUFFER, lineVertexBuffer);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
-			gl.vertexAttribPointer(vsPosLocation, 2, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 0);
-			gl.enableVertexAttribArray(vsPosLocation);
-			gl.vertexAttribPointer(vsColorLocation, 4, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 2 * Float32Array.BYTES_PER_ELEMENT);
-			gl.enableVertexAttribArray(vsColorLocation);
+
+			const stride = 11 * Float32Array.BYTES_PER_ELEMENT; // p0(2), p1(2), color(4), thickness(1), corner(2) = 11 floats
+			// aP0
+			gl.vertexAttribPointer(vsP0Location, 2, gl.FLOAT, false, stride, 0);
+			gl.enableVertexAttribArray(vsP0Location);
+			// aP1
+			gl.vertexAttribPointer(vsP1Location, 2, gl.FLOAT, false, stride, 2 * Float32Array.BYTES_PER_ELEMENT);
+			gl.enableVertexAttribArray(vsP1Location);
+			// aColorIntensity
+			gl.vertexAttribPointer(vsColorIntensityLocation, 4, gl.FLOAT, false, stride, 4 * Float32Array.BYTES_PER_ELEMENT);
+			gl.enableVertexAttribArray(vsColorIntensityLocation);
+			// aThickness
+			gl.vertexAttribPointer(vsThicknessLocation, 1, gl.FLOAT, false, stride, 8 * Float32Array.BYTES_PER_ELEMENT);
+			gl.enableVertexAttribArray(vsThicknessLocation);
+			// aCornerOffset
+			gl.vertexAttribPointer(vsCornerOffsetLocation, 2, gl.FLOAT, false, stride, 9 * Float32Array.BYTES_PER_ELEMENT);
+			gl.enableVertexAttribArray(vsCornerOffsetLocation);
+			
+			// Set uniforms for the vector shader
 			gl.uniform2f(vsResolutionLocation, gl.canvas.width, gl.canvas.height);
+			// console.log("webGLGlowMultiplier sent to shader:", webGLGlowMultiplier); // Uncomment for debugging
 			gl.uniform1f(vsGlowMultiplierLocation, webGLGlowMultiplier);
-			// gl.lineWidth(avgLineWidthForPass); // If using gl.lineWidth
-			gl.drawArrays(gl.LINES, 0, vertices.length / 6);
+			
+			gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11); // 11 components per vertex
 		}
 	}
 	gl.disable(gl.BLEND);
@@ -621,7 +713,7 @@ function renderWebGLFrame() {
 	lastPoint = {...originalFrameLastPoint};
 	SCALE_FACTOR = originalFrameSCALE_FACTOR;
 	COLOR = originalFrameCOLOR;
-	lastIntensity = originalFrameLastIntensity;
+	lastIntensity = originalFrameLastIntensity; // Restore for the main simulation advancement
 	HALT_FLAG = 0; // Reset for the main simulation logic that advances pc
 
 	// Advance the main simulation pc, lastPoint etc. after generating all draw data for this frame
@@ -751,6 +843,7 @@ function keyHandle(evt) {
 				webGLGlowMultiplier += 0.1;
 				if (webGLGlowMultiplier > 5.0) webGLGlowMultiplier = 5.0;
 				if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
+				if (webGLGlowMultiplierSlider) webGLGlowMultiplierSlider.value = webGLGlowMultiplier.toFixed(2);
 			}
 		} else if (evt.which == 34) { // PageDown
 			evt.preventDefault();
@@ -758,6 +851,21 @@ function keyHandle(evt) {
 				webGLGlowMultiplier -= 0.1;
 				if (webGLGlowMultiplier < 0.0) webGLGlowMultiplier = 0.0;
 				if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
+				if (webGLGlowMultiplierSlider) webGLGlowMultiplierSlider.value = webGLGlowMultiplier.toFixed(2);
+			}
+		} else if (evt.altKey && evt.ctrlKey && evt.which == 33) { // Ctrl + Alt + PageUp for Line Width
+			evt.preventDefault();
+			if (useWebGLRenderer && webGLSupported) {
+				webGLLineWidthMultiplier = Math.min(10.0, webGLLineWidthMultiplier + 0.1);
+				if (webGLLineWidthDisplay) webGLLineWidthDisplay.innerHTML = webGLLineWidthMultiplier.toFixed(2);
+				if (webGLLineWidthMultiplierSlider) webGLLineWidthMultiplierSlider.value = webGLLineWidthMultiplier.toFixed(2);
+			}
+		} else if (evt.altKey && evt.ctrlKey && evt.which == 34) { // Ctrl + Alt + PageDown for Line Width
+			evt.preventDefault();
+			if (useWebGLRenderer && webGLSupported) {
+				webGLLineWidthMultiplier = Math.max(0.1, webGLLineWidthMultiplier - 0.1);
+				if (webGLLineWidthDisplay) webGLLineWidthDisplay.innerHTML = webGLLineWidthMultiplier.toFixed(2);
+				if (webGLLineWidthMultiplierSlider) webGLLineWidthMultiplierSlider.value = webGLLineWidthMultiplier.toFixed(2);
 			}
 		} else if (evt.shiftKey && useWebGLRenderer && webGLSupported) { // Ctrl + Shift + Key for decay rates
 			evt.preventDefault();
@@ -808,7 +916,26 @@ window.addEventListener("load", async () => {
 	DVG = canvasElement.getContext("2d");
 	webGLCanvasElement = document.getElementById("webglCanvas");
 	rendererTogglerButton = document.getElementById("rendererToggler");
+	
 	webGLGlowDisplay = document.getElementById("webGLGlowValue");
+	webGLGlowMultiplierSlider = document.getElementById("webGLGlowMultiplierSlider");
+	if (webGLGlowMultiplierSlider) {
+		webGLGlowMultiplierSlider.value = webGLGlowMultiplier.toFixed(2);
+		webGLGlowMultiplierSlider.addEventListener('input', (e) => {
+			webGLGlowMultiplier = parseFloat(e.target.value);
+			if (webGLGlowDisplay) webGLGlowDisplay.textContent = webGLGlowMultiplier.toFixed(2);
+		});
+	}
+
+	webGLLineWidthDisplay = document.getElementById("webGLLineWidthValue");
+	webGLLineWidthMultiplierSlider = document.getElementById("webGLLineWidthMultiplierSlider");
+	if (webGLLineWidthMultiplierSlider) {
+		webGLLineWidthMultiplierSlider.value = webGLLineWidthMultiplier.toFixed(2);
+		webGLLineWidthMultiplierSlider.addEventListener('input', (e) => {
+			webGLLineWidthMultiplier = parseFloat(e.target.value);
+			if (webGLLineWidthDisplay) webGLLineWidthDisplay.textContent = webGLLineWidthMultiplier.toFixed(2);
+		});
+	}
 	
 	webGLRedDecayRateSlider = document.getElementById("redDecayRate");
 	webGLGreenDecayRateSlider = document.getElementById("greenDecayRate");
