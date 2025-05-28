@@ -6,6 +6,7 @@ import * as levels from './levels.js';
 
 let animationFrameId = null;
 let sendDVGToMonitor = null; // Function to send DVG commands
+let lastSentDVGString = null; // Stores the last DVG string sent to the monitor
 
 // --- BEGIN DEBUG LOGGING VARIABLES ---
 const DEBUG_GAME_LOOP = false; // Master switch for game loop debug logs
@@ -107,9 +108,13 @@ function gameLoop() {
 
     dvgCommands.push('JMPL START');
 
-    // 4. Send DVG to Monitor
+    // 4. Send DVG to Monitor only if it has changed
+    const currentDVGString = dvgCommands.join('\n');
     if (sendDVGToMonitor) {
-        sendDVGToMonitor(dvgCommands.join('\n'), dvgCommands.length * 60); // Adjust VPS as needed
+        if (currentDVGString !== lastSentDVGString) {
+            sendDVGToMonitor(currentDVGString, dvgCommands.length * 60); // Adjust VPS as needed
+            lastSentDVGString = currentDVGString;
+        }
     } else {
         console.warn('sendDVGToMonitor is not available. DVG commands not sent.');
     }
@@ -121,6 +126,7 @@ function gameLoop() {
 export function startGame(sendFunction) {
     console.log("static/game/main.js: Starting game...");
     sendDVGToMonitor = sendFunction; // Assign the passed function
+    lastSentDVGString = null; // Reset last sent DVG string to ensure the first frame is sent
 
     const levelData = levels.getCurrentLevelData();
     if (!levelData) {
