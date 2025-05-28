@@ -375,6 +375,44 @@ export function drawHatch(gameX, gameY, width, height, spacing, colorIndex, inte
     return commands;
 }
 
+/**
+ * Generates DVG commands to draw an explosion fragment (a line).
+ * Assumes fragment.x, fragment.y is the center of the line.
+ * @param {object} fragment - The fragment object { x, y, currentLength, rotation, color, currentIntensity }.
+ * @param {number} gameWidth - The width of the game area.
+ * @param {number} gameHeight - The height of the game area.
+ * @returns {string[]} Array of DVG commands.
+ */
+export function drawExplosionFragment(fragment, gameWidth, gameHeight) {
+    const commands = [];
+    if (fragment.currentLength <= 0.1 || fragment.currentIntensity <= 0) return commands; // Don't draw tiny/invisible fragments
+
+    const halfLen = fragment.currentLength / 2;
+    const cosAngle = Math.cos(fragment.rotation);
+    const sinAngle = Math.sin(fragment.rotation);
+
+    // Calculate endpoints in game coordinates, relative to fragment's center (fragment.x, fragment.y)
+    const gameP1 = {
+        x: fragment.x - halfLen * cosAngle,
+        y: fragment.y - halfLen * sinAngle  // In game space, Y is down, but standard angle math (0 rad = +X axis) is used.
+                                            // The toDVGCoords will handle Y inversion.
+    };
+    const gameP2 = {
+        x: fragment.x + halfLen * cosAngle,
+        y: fragment.y + halfLen * sinAngle
+    };
+
+    // Convert to DVG coordinates
+    const dvgP1 = toDVGCoords(gameP1.x, gameP1.y, gameWidth, gameHeight);
+    const dvgP2 = toDVGCoords(gameP2.x, gameP2.y, gameWidth, gameHeight);
+
+    commands.push(color(fragment.color));
+    commands.push(labs(dvgP1.x, dvgP1.y, DVG_SCALE_INDEX_1X));
+    commands.push(vctr(dvgP2.x - dvgP1.x, dvgP2.y - dvgP1.y, 1, Math.round(fragment.currentIntensity)));
+
+    return commands;
+}
+
 // Placeholder for text drawing - this is complex
 // For now, it draws a small square marker in game space.
 export function drawText(text, gameX, gameY, size, colorIndex, intensity, gameWidth, gameHeight) {

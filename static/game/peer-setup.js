@@ -6,11 +6,18 @@ import { restartGame } from './game.js';
 
 let peer = null;
 let gameConnection = null;
-const monitorPeerId = 'vectorGameMonitorInstance1'; // Ensure this matches the monitor's PeerJS ID
-const gamePeerId = 'vectorGameSenderInstance1'; // Unique ID for the game page
+
+// Generate a unique suffix for PeerJS IDs
+const uniqueSuffix = Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
+
+const dynamicMonitorPeerId = `vectorGameMonitorInstance-${uniqueSuffix}`;
+const dynamicGamePeerId = `vectorGameSenderInstance-${uniqueSuffix}`;
+
+console.log(`Using dynamicMonitorPeerId: ${dynamicMonitorPeerId}`);
+console.log(`Using dynamicGamePeerId: ${dynamicGamePeerId}`);
 
 function initializeGamePeer() {
-    peer = new Peer(gamePeerId, { debug: 2 });
+    peer = new Peer(dynamicGamePeerId, { debug: 2 });
 
     peer.on('open', (id) => {
         console.log('Game PeerJS ID:', id);
@@ -46,11 +53,11 @@ function connectToMonitor() {
         return;
     }
 
-    console.log(`Attempting to connect to monitor with PeerJS ID: ${monitorPeerId}`);
-    gameConnection = peer.connect(monitorPeerId, { reliable: true });
+    console.log(`Attempting to connect to monitor with PeerJS ID: ${dynamicMonitorPeerId}`);
+    gameConnection = peer.connect(dynamicMonitorPeerId, { reliable: true });
 
     gameConnection.on('open', () => {
-        console.log(`Successfully connected to monitor: ${monitorPeerId}`);
+        console.log(`Successfully connected to monitor: ${dynamicMonitorPeerId}`);
         gameConnection.send('Hello from game page! Connection established.');
         startGame(sendDVGCommands); // Pass the sendDVGCommands function to startGame
     });
@@ -150,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const monitorFrame = document.getElementById('monitorFrame');
     // Monitor is served from root, game.html is at /game.
     // So, path to monitor_display.html is relative to root.
-    const monitorSrc = `/monitor_display.html?peerId=${monitorPeerId}`;
+    const monitorSrc = `/monitor_display.html?peerId=${dynamicMonitorPeerId}`;
     monitorFrame.src = monitorSrc;
     console.log(`Set monitor iframe src to: ${monitorSrc}`);
 

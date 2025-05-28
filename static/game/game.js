@@ -19,6 +19,13 @@ export const PROJECTILE_LENGTH = 20;
 export const ENEMY_SIZE = 30;
 const MAX_PROJECTILES = 5;
 
+// Explosion constants
+const EXPLOSION_LIFETIME = 30; // frames, e.g., 0.5 seconds at 60fps
+const FRAGMENT_BASE_SPEED = 2.5;
+const FRAGMENT_ROTATION_SPEED = 0.1; // radians per frame
+const FRAGMENT_DEFAULT_LENGTH = 15;
+
+
 // Player state
 let player = {
     x: GAME_WIDTH / 2,
@@ -37,6 +44,9 @@ let projectiles = []; // Array of {x, y, active}
 
 // Enemies state
 let enemies = []; // Array of {x, y, type, width, height, active, color, intensity}
+
+// Explosions state
+let explosions = []; // Array of explosion objects { x, y, fragments: [], lifetime }
 
 // Game state
 let gameState = 'playing'; // 'playing', 'gameOver'
@@ -63,6 +73,7 @@ export function initGame(levelData) {
     // Clear arrays
     projectiles = [];
     enemies = [];
+    explosions = []; // Clear explosions
 
     // Load enemies from level data (simple example)
     if (levelData && levelData.enemies) {
@@ -185,6 +196,9 @@ export function updateGame(input) {
     // Collision detection
     checkCollisions();
 
+    // Update explosions
+    updateExplosions();
+
     // Spawn new enemies if needed (very basic for now)
     if (enemies.length < 3 && Math.random() < 0.01) { // Randomly spawn if few enemies
         const randomX = Math.random() * (GAME_WIDTH - ENEMY_SIZE) + ENEMY_SIZE / 2;
@@ -230,6 +244,112 @@ function spawnEnemy(x, y, type, color, intensity) {
     });
 }
 
+function createFragment(x, y, dx, dy, initialLength, dRotation, color, initialIntensity, lifetime, isBoxSide = false, initialRotation = 0) {
+    return {
+        x, y, dx, dy,
+        currentLength: initialLength,
+        initialLength,
+        rotation: initialRotation,
+        dRotation: isBoxSide ? 0 : dRotation,
+        color,
+        currentIntensity: initialIntensity,
+        initialIntensity,
+        lifetime,
+        isBoxSide
+    };
+}
+
+function spawnExplosion(enemy) {
+    const newExplosion = {
+        x: enemy.x,
+        y: enemy.y,
+        fragments: []
+        // lifetime: EXPLOSION_LIFETIME // Not strictly needed if fragments manage their own
+    };
+
+    if (enemy.type === 'square') {
+        const halfW = enemy.width / 2;
+        const halfH = enemy.height / 2;
+        const outwardSpeed = FRAGMENT_BASE_SPEED * 0.6;
+
+        // Top edge
+        newExplosion.fragments.push(createFragment(enemy.x, enemy.y - halfH, 0, -outwardSpeed, enemy.width, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, 0));
+        // Bottom edge
+        newExplosion.fragments.push(createFragment(enemy.x, enemy.y + halfH, 0, outwardSpeed, enemy.width, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, 0));
+        // Left edge
+        newExplosion.fragments.push(createFragment(enemy.x - halfW, enemy.y, -outwardSpeed, 0, enemy.height, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, Math.PI / 2));
+        // Right edge
+        newExplosion.fragments.push(createFragment(enemy.x + halfW, enemy.y, outwardSpeed, 0, enemy.height, 0, enemy.color, enemy.intensity, EXPLOSION_LIFETIME, true, Math.PI / 2));
+    } else if (enemy.type === 'x') {
+        const lineLength = enemy.width * Math.sqrt(2); // enemy.width is the size of the bounding box for X
+
+        // Fragment 1 (diagonal \)
+        const angle1 = Math.PI / 4; // 45 degrees
+        newExplosion.fragments.push(createFragment(
+            enemy.x, enemy.y,
+            FRAGMENT_BASE_SPEED * Math.cos(angle1 + Math.PI / 2) * 0.7, // Move perpendicular to line, slightly slower
+            FRAGMENT_BASE_SPEED * Math.sin(angle1 + Math.PI / 2) * 0.7,
+            lineLength,
+            FRAGMENT_ROTATION_SPEED * (Math.random() > 0.5 ? 1 : -1),
+            enemy.color, enemy.intensity, EXPLOSION_LIFETIME,
+            false, angle1
+        ));
+
+        // Fragment 2 (diagonal /)
+        const angle2 = -Math.PI / 4; // -45 degrees
+        newExplosion.fragments.push(createFragment(
+            enemy.x, enemy.y,
+            FRAGMENT_BASE_SPEED * Math.cos(angle2 + Math.PI / 2) * 0.7, // Move perpendicular to line
+            FRAGMENT_BASE_SPEED * Math.sin(angle2 + Math.PI / 2) * 0.7,
+            lineLength,
+            FRAGMENT_ROTATION_SPEED * (Math.random() > 0.5 ? 1 : -1),
+            enemy.color, enemy.intensity, EXPLOSION_LIFETIME,
+            false, angle2
+        ));
+    } else { // Default: radial burst of small lines
+        const numFragments = 6;
+        for (let i = 0; i < numFragments; i++) {
+            const angle = (i / numFragments) * Math.PI * 2;
+            newExplosion.fragments.push(createFragment(
+                enemy.x, enemy.y,
+                FRAGMENT_BASE_SPEED * Math.cos(angle), FRAGMENT_BASE_SPEED * Math.sin(angle),
+                FRAGMENT_DEFAULT_LENGTH, FRAGMENT_ROTATION_SPEED * (Math.random() - 0.5) * 4, // Faster rotation for small bits
+                enemy.color, enemy.intensity, EXPLOSION_LIFETIME,
+                false, angle
+            ));
+        }
+    }
+    explosions.push(newExplosion);
+}
+
+function updateExplosions() {
+    for (let i = explosions.length - 1; i >= 0; i--) {
+        const explosion = explosions[i];
+
+        for (let j = explosion.fragments.length - 1; j >= 0; j--) {
+            const frag = explosion.fragments[j];
+            frag.x += frag.dx;
+            frag.y += frag.dy;
+            frag.rotation += frag.dRotation;
+            frag.lifetime--;
+
+            if (!frag.isBoxSide) { // Box sides maintain length, others shrink
+                 frag.currentLength = frag.initialLength * Math.max(0, (frag.lifetime / EXPLOSION_LIFETIME));
+            }
+            frag.currentIntensity = Math.max(1, Math.round(frag.initialIntensity * (frag.lifetime / EXPLOSION_LIFETIME)));
+
+
+            if (frag.lifetime <= 0 || frag.currentLength <= 0) {
+                explosion.fragments.splice(j, 1);
+            }
+        }
+
+        if (explosion.fragments.length === 0) {
+            explosions.splice(i, 1);
+        }
+    }
+}
+
 function checkCollisions() {
     // Projectile-Enemy collisions
     let projectileCollisionDebugLogged = false; // Flag to log only for the first P-E pair
@@ -264,10 +384,11 @@ function checkCollisions() {
                 projectileTop < enemyBottom) {
 
                 p.active = false;
-                e.active = false; // Enemy is hit
+                // e.active = false; // Enemy is hit - Replaced by spawnExplosion
+                spawnExplosion(e); // Spawn explosion
+                e.active = false; // Then mark enemy as inactive
                 player.score += 10; // Increase score
                 // console.log('Enemy hit! Score:', player.score);
-                // TODO: Add explosion effect later
             }
         });
     });
@@ -326,4 +447,15 @@ export function getScore() {
 
 export function getLives() {
     return player.lives;
+}
+
+export function getExplosionsState() {
+    let activeFragments = [];
+    explosions.forEach(exp => {
+        exp.fragments.forEach(frag => {
+            // Make sure to pass a copy of the fragment for rendering
+            activeFragments.push({...frag});
+        });
+    });
+    return activeFragments;
 }

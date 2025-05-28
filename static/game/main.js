@@ -22,6 +22,7 @@ function gameLoop() {
     const playerState = game.getPlayerState();
     const projectilesState = game.getProjectilesState();
     const enemiesState = game.getEnemiesState();
+    const explosionsState = game.getExplosionsState(); // Get active explosion fragments
     const currentGameState = game.getGameState();
     const score = game.getScore();
     const lives = game.getLives();
@@ -87,6 +88,11 @@ function gameLoop() {
         for (let i = 0; i < lives; i++) {
             dvgCommands.push(...vector.drawPlayer(lifeMarkerX - i * lifeSpacing, lifeMarkerY, lifeSize, playerState.color, playerState.intensity, game.GAME_WIDTH, game.GAME_HEIGHT));
         }
+
+        // Draw explosions
+        explosionsState.forEach(fragment => {
+            dvgCommands.push(...vector.drawExplosionFragment(fragment, game.GAME_WIDTH, game.GAME_HEIGHT));
+        });
 
     } else if (currentGameState === 'gameOver') {
         // Draw "GAME OVER" text in white (color 0) with intensity 2
