@@ -16,6 +16,11 @@ var dsPosLocation, dsDecayAmountLocation; // Decay Shader
 var lineVertexBuffer = null;
 var decayQuadBuffer = null;
 
+// WebGL specific settings
+var webGLGlowMultiplier = 1.0;
+var webGLGlowDisplay = null;
+var vsGlowMultiplierLocation = null;
+
 
 canvasElement.width = window.innerWidth;
 canvasElement.height = window.innerHeight;
@@ -27,7 +32,7 @@ tailsY = Array(0, 0, 0);
 // bufferWidth = canvasElement.width * 4; // Not used directly in WebGL like this
 // bufferDepth = bufferWidth * canvasElement.height; // Not used
 var maxOps = 40;
-var pDecay = 0.22; // Alpha for black overlay, meaning (1-pDecay) of previous frame remains
+var pDecay = 0.15; // Alpha for black overlay, meaning (1-pDecay) of previous frame remains. Lowered from 0.22.
 lastPoint = new Object();
 lastPoint.x = 0;
 lastPoint.y = 0;
@@ -149,6 +154,9 @@ async function initWebGL() {
 	dsPosLocation = gl.getAttribLocation(decayShaderProgram, 'aPosition');
 	dsDecayAmountLocation = gl.getUniformLocation(decayShaderProgram, 'uDecayAmount');
 
+	// Vector Shader Uniforms
+	vsGlowMultiplierLocation = gl.getUniformLocation(vectorShaderProgram, 'uGlowMultiplier');
+
 	// Buffers
 	lineVertexBuffer = gl.createBuffer();
 	const quadVertices = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
@@ -167,12 +175,19 @@ function updateRendererToggleButton() {
 	if (rendererTogglerButton) {
 		rendererTogglerButton.textContent = `Toggle Renderer (Current: ${useWebGLRenderer ? 'WebGL' : '2D'})`;
 	}
+	
+	var webGLSettingsElement = document.getElementById("webglSettings");
+
 	if (useWebGLRenderer && webGLSupported) {
 		webGLCanvasElement.style.display = 'block';
 		canvasElement.style.display = 'none';
+		if (webGLSettingsElement) webGLSettingsElement.style.display = 'block';
+		if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
+
 	} else {
 		webGLCanvasElement.style.display = 'none';
 		canvasElement.style.display = 'block';
+		if (webGLSettingsElement) webGLSettingsElement.style.display = 'none';
 		useWebGLRenderer = false; // Fallback if WebGL init failed or toggled off
 	}
 }
@@ -371,6 +386,9 @@ function glowStroke2D() {
 function renderWebGLFrame() {
 	if (!gl || HALT_FLAG == 1) return;
 
+	gl.clearColor(0.0, 0.0, 0.0, 1.0); // Ensure background is black
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
 	// 1. Decay Pass (draw semi-transparent black quad)
@@ -497,6 +515,7 @@ function renderWebGLFrame() {
 			gl.vertexAttribPointer(vsColorLocation, 4, gl.FLOAT, false, 6 * Float32Array.BYTES_PER_ELEMENT, 2 * Float32Array.BYTES_PER_ELEMENT);
 			gl.enableVertexAttribArray(vsColorLocation);
 			gl.uniform2f(vsResolutionLocation, gl.canvas.width, gl.canvas.height);
+			gl.uniform1f(vsGlowMultiplierLocation, webGLGlowMultiplier);
 			// gl.lineWidth(avgLineWidthForPass); // If using gl.lineWidth
 			gl.drawArrays(gl.LINES, 0, vertices.length / 6);
 		}
@@ -629,6 +648,21 @@ function keyHandle(evt) {
 		else if (evt.which == 188) { maxOps--; if (maxOps < 1) maxOps = 1; if (vps) vps.innerHTML = maxOps * 50; }
 		else if (evt.which == 219) { pDecay -= 0.05; if (pDecay < 0) pDecay = 0; if (decay) decay.innerHTML = "-" + (Math.round(pDecay * 100)) + '%/frame'; }
 		else if (evt.which == 221) { pDecay += 0.05; if (pDecay > 1) pDecay = 1; if (decay) decay.innerHTML = "-" + (Math.round(pDecay * 100)) + '%/frame'; }
+		else if (evt.which == 33) { // PageUp
+			evt.preventDefault();
+			if (useWebGLRenderer && webGLSupported) {
+				webGLGlowMultiplier += 0.1;
+				if (webGLGlowMultiplier > 5.0) webGLGlowMultiplier = 5.0;
+				if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
+			}
+		} else if (evt.which == 34) { // PageDown
+			evt.preventDefault();
+			if (useWebGLRenderer && webGLSupported) {
+				webGLGlowMultiplier -= 0.1;
+				if (webGLGlowMultiplier < 0.0) webGLGlowMultiplier = 0.0;
+				if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
+			}
+		}
 	}
 }
 
@@ -655,6 +689,12 @@ window.addEventListener("load", async () => {
 	DVG = canvasElement.getContext("2d");
 	webGLCanvasElement = document.getElementById("webglCanvas");
 	rendererTogglerButton = document.getElementById("rendererToggler");
+	webGLGlowDisplay = document.getElementById("webGLGlowValue"); // Corrected ID
+	
+	var webGLSettingsElement = document.getElementById("webglSettings");
+	if (webGLSettingsElement) { // Initially hide WebGL specific settings
+		webGLSettingsElement.style.display = 'none';
+	}
 
 
 	if (canvasElement) {
