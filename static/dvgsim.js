@@ -13,7 +13,8 @@ var compositeShaderProgram = null;
 
 // Vector Shader (for quads)
 var vsP0Location, vsP1Location, vsColorIntensityLocation, vsThicknessLocation, vsCornerOffsetLocation;
-var vsResolutionLocation, vsGlowMultiplierLocation; // Uniforms
+var vsStartTimeLocation, vsDrawDurationLocation; // New attributes for timing
+var vsResolutionLocation, vsGlowMultiplierLocation, vsCurrentTimeLocation, vsIntraVectorDecayRateLocation, vsAntialiasPixelWidthLocation, vsQuadExpansionMarginLocation; // Uniforms
 
 // CombineDecay Shader
 var cdsPosLocation, cdsPreviousStateTexLocation, cdsCurrentLinesTexLocation, cdsGlobalDecayLocation, cdsDifferentialDecayRatesLocation;
@@ -41,6 +42,16 @@ var maxGlLineWidthRange = [1, 1]; // Stores min/max supported line width
 var webGLDifferentialDecayRates = { r: 0.5, g: 1.0, b: 2.5 };
 var webGLRedDecayRateSlider = null, webGLGreenDecayRateSlider = null, webGLBlueDecayRateSlider = null;
 var webGLRedDecayValueDisplay = null, webGLGreenDecayValueDisplay = null, webGLBlueDecayValueDisplay = null;
+
+// New parameters for enhanced vector rendering
+var webGLBeamSpeed = 1000.0; // pixels per second
+var webGLIntraVectorDecayRate = 5.0; // decay rate for intra-vector fading
+var webGLAntialiasPixelWidth = 1.5; // pixel width for SDF anti-aliasing
+const QUAD_EXPANSION_MARGIN = 3.0; // pixels to expand quad for SDF rendering
+
+var webGLBeamSpeedSlider = null, webGLBeamSpeedDisplay = null;
+var webGLIntraVectorDecayRateSlider = null, webGLIntraVectorDecayRateDisplay = null;
+var webGLAntialiasPixelWidthSlider = null, webGLAntialiasPixelWidthDisplay = null;
 
 
 canvasElement.width = window.innerWidth;
@@ -174,14 +185,24 @@ async function initWebGL() {
 	vsColorIntensityLocation = gl.getAttribLocation(vectorShaderProgram, 'aColorIntensity');
 	vsThicknessLocation = gl.getAttribLocation(vectorShaderProgram, 'aThickness');
 	vsCornerOffsetLocation = gl.getAttribLocation(vectorShaderProgram, 'aCornerOffset');
+	vsStartTimeLocation = gl.getAttribLocation(vectorShaderProgram, 'aScheduledDrawTime'); // Renamed attribute
+	vsDrawDurationLocation = gl.getAttribLocation(vectorShaderProgram, 'aDrawDuration');
 	
 	vsResolutionLocation = gl.getUniformLocation(vectorShaderProgram, 'uResolution');
 	vsGlowMultiplierLocation = gl.getUniformLocation(vectorShaderProgram, 'uGlowMultiplier');
+	vsCurrentTimeLocation = gl.getUniformLocation(vectorShaderProgram, 'uPassEvaluationTime'); // Renamed uniform
+	vsIntraVectorDecayRateLocation = gl.getUniformLocation(vectorShaderProgram, 'uIntraVectorDecayRate');
+	vsAntialiasPixelWidthLocation = gl.getUniformLocation(vectorShaderProgram, 'uAntialiasPixelWidth');
+	vsQuadExpansionMarginLocation = gl.getUniformLocation(vectorShaderProgram, 'uQuadExpansionMargin');
+
 	if (vsGlowMultiplierLocation === null || vsGlowMultiplierLocation === -1) {
 		console.error("Failed to get uniform location for uGlowMultiplier.");
 	}
-	if (vsP0Location === -1 || vsP1Location === -1 || vsColorIntensityLocation === -1 || vsThicknessLocation === -1 || vsCornerOffsetLocation === -1) {
+	if (vsP0Location === -1 || vsP1Location === -1 || vsColorIntensityLocation === -1 || vsThicknessLocation === -1 || vsCornerOffsetLocation === -1 || vsStartTimeLocation === -1 || vsDrawDurationLocation === -1) {
 		console.error("Failed to get one or more attribute locations for vectorShaderProgram (quads).");
+	}
+	if (vsResolutionLocation === -1 || vsCurrentTimeLocation === -1 || vsIntraVectorDecayRateLocation === -1 || vsAntialiasPixelWidthLocation === -1 || vsQuadExpansionMarginLocation === -1) {
+		console.error("Failed to get one or more uniform locations for new vector shader parameters.");
 	}
 
 
@@ -293,6 +314,15 @@ function updateRendererToggleButton() {
 		if (webGLGlowMultiplierSlider) webGLGlowMultiplierSlider.value = webGLGlowMultiplier.toFixed(2);
 		if (webGLLineWidthDisplay) webGLLineWidthDisplay.innerHTML = webGLLineWidthMultiplier.toFixed(2);
 		if (webGLLineWidthMultiplierSlider) webGLLineWidthMultiplierSlider.value = webGLLineWidthMultiplier.toFixed(2);
+		
+		// Update new UI elements
+		if (webGLBeamSpeedDisplay) webGLBeamSpeedDisplay.textContent = webGLBeamSpeed.toFixed(0);
+		if (webGLBeamSpeedSlider) webGLBeamSpeedSlider.value = webGLBeamSpeed.toFixed(0);
+		if (webGLIntraVectorDecayRateDisplay) webGLIntraVectorDecayRateDisplay.textContent = webGLIntraVectorDecayRate.toFixed(2);
+		if (webGLIntraVectorDecayRateSlider) webGLIntraVectorDecayRateSlider.value = webGLIntraVectorDecayRate.toFixed(2);
+		if (webGLAntialiasPixelWidthDisplay) webGLAntialiasPixelWidthDisplay.textContent = webGLAntialiasPixelWidth.toFixed(2);
+		if (webGLAntialiasPixelWidthSlider) webGLAntialiasPixelWidthSlider.value = webGLAntialiasPixelWidth.toFixed(2);
+
 
 	} else {
 		webGLCanvasElement.style.display = 'none';
@@ -525,6 +555,7 @@ function renderWebGLFrame() {
 	const originalFrameCOLOR = COLOR;
 	const originalFrameLastIntensity = lastIntensity; // Save this for consistent state reset
 
+	const frameStartTime = performance.now() / 1000.0; // Time at the start of this frame's rendering logic
 
 	const glowPasses = [
 		{ brightArray: intBright3, widthArray: intWidths3 },
@@ -534,6 +565,7 @@ function renderWebGLFrame() {
 
 	for (const pass of glowPasses) {
 		vertices = [];
+		let accumulatedDurationWithinPass = 0.0; // Seconds, reset for each pass's vertex generation
 		// Reset simulation state for this pass's data generation
 		pc = originalFramePC;
 		lastPoint = {...originalFrameLastPoint};
@@ -584,17 +616,23 @@ function renderWebGLFrame() {
 				currentThickness = Math.max(0.5, currentThickness); // Minimum 0.5 pixel thickness
 
 				// Triangle 1: (P0, sideA), (P1, sideA), (P0, sideB)
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0, -1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
+				const vectorLengthPixelsVCTR = Math.sqrt(relX * relX + relY * relY);
+				const vectorDrawDuration = (webGLBeamSpeed > 0.001) ? (vectorLengthPixelsVCTR / webGLBeamSpeed) : 0.0;
+				// vectorOffsetInPass is `accumulatedDurationWithinPass` *before* this vector's duration is added
+				const vectorScheduledDrawTime = frameStartTime + accumulatedDurationWithinPass;
+				
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0, -1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0, vectorScheduledDrawTime, vectorDrawDuration);
 				// Triangle 2: (P1, sideA), (P1, sideB), (P0, sideB)
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0,  1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0,  1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				accumulatedDurationWithinPass += vectorDrawDuration;
 			}
 			else if (thisOp.opcode == "SVEC") {
 				var relX = thisOp.x << (4 + thisOp.scale);
-				var relY = thisOp.y << (4 + thisOp.scale); // Note: original code had `this.scale` here, likely a typo for `thisOp.scale`
+				var relY = thisOp.y << (4 + thisOp.scale);
 				if (thisOp.intensity != lastIntensity) {
 					lastIntensity = thisOp.intensity;
 				}
@@ -609,14 +647,18 @@ function renderWebGLFrame() {
 				let x1 = lastPoint.x;
 				let y1 = lastPoint.y;
 
-				// Triangle 1
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0, -1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
+				const vectorLengthPixelsSVEC = Math.sqrt(relX * relX + relY * relY);
+				const vectorDrawDuration = (webGLBeamSpeed > 0.001) ? (vectorLengthPixelsSVEC / webGLBeamSpeed) : 0.0;
+				const vectorScheduledDrawTime = frameStartTime + accumulatedDurationWithinPass;
+
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0, -1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0, vectorScheduledDrawTime, vectorDrawDuration);
 				// Triangle 2
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0,  1.0);
-				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0, -1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness,  1.0,  1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				vertices.push(x0,y0, x1,y1, opColor[0]/255, opColor[1]/255, opColor[2]/255, opIntensity, currentThickness, -1.0,  1.0, vectorScheduledDrawTime, vectorDrawDuration);
+				accumulatedDurationWithinPass += vectorDrawDuration;
 			} else if (thisOp.opcode == "JMPL") {
 				if (typeof thisOp.target !== 'number' || thisOp.target < 0 || thisOp.target >= program.length) { HALT_FLAG = 1; break; }
 				pc = thisOp.target; continue;
@@ -635,7 +677,7 @@ function renderWebGLFrame() {
 			gl.bindBuffer(gl.ARRAY_BUFFER, lineVertexBuffer);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 
-			const stride = 11 * Float32Array.BYTES_PER_ELEMENT; // p0(2), p1(2), color(4), thickness(1), corner(2) = 11 floats
+			const stride = 13 * Float32Array.BYTES_PER_ELEMENT; // p0(2), p1(2), colorIntensity(4), thickness(1), corner(2), startTime(1), drawDuration(1) = 13 floats
 			// aP0
 			gl.vertexAttribPointer(vsP0Location, 2, gl.FLOAT, false, stride, 0);
 			gl.enableVertexAttribArray(vsP0Location);
@@ -651,13 +693,25 @@ function renderWebGLFrame() {
 			// aCornerOffset
 			gl.vertexAttribPointer(vsCornerOffsetLocation, 2, gl.FLOAT, false, stride, 9 * Float32Array.BYTES_PER_ELEMENT);
 			gl.enableVertexAttribArray(vsCornerOffsetLocation);
+			// aStartTime
+			gl.vertexAttribPointer(vsStartTimeLocation, 1, gl.FLOAT, false, stride, 11 * Float32Array.BYTES_PER_ELEMENT);
+			gl.enableVertexAttribArray(vsStartTimeLocation);
+			// aDrawDuration
+			gl.vertexAttribPointer(vsDrawDurationLocation, 1, gl.FLOAT, false, stride, 12 * Float32Array.BYTES_PER_ELEMENT);
+			gl.enableVertexAttribArray(vsDrawDurationLocation);
 			
 			// Set uniforms for the vector shader
+			// accumulatedDurationWithinPass now holds the total duration of all vectors in this pass
+			const passEvaluationTime = frameStartTime + accumulatedDurationWithinPass;
+
 			gl.uniform2f(vsResolutionLocation, gl.canvas.width, gl.canvas.height);
-			// console.log("webGLGlowMultiplier sent to shader:", webGLGlowMultiplier); // Uncomment for debugging
 			gl.uniform1f(vsGlowMultiplierLocation, webGLGlowMultiplier);
+			gl.uniform1f(vsCurrentTimeLocation, passEvaluationTime); // Set uPassEvaluationTime
+			gl.uniform1f(vsIntraVectorDecayRateLocation, webGLIntraVectorDecayRate);
+			gl.uniform1f(vsAntialiasPixelWidthLocation, webGLAntialiasPixelWidth);
+			gl.uniform1f(vsQuadExpansionMarginLocation, QUAD_EXPANSION_MARGIN);
 			
-			gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 11); // 11 components per vertex
+			gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 13); // 13 components per vertex
 		}
 	}
 	gl.disable(gl.BLEND);
@@ -947,6 +1001,37 @@ window.addEventListener("load", async () => {
 	if (webGLRedDecayRateSlider) webGLRedDecayRateSlider.addEventListener('input', (e) => { webGLDifferentialDecayRates.r = parseFloat(e.target.value); updateDifferentialDecayUI(); });
 	if (webGLGreenDecayRateSlider) webGLGreenDecayRateSlider.addEventListener('input', (e) => { webGLDifferentialDecayRates.g = parseFloat(e.target.value); updateDifferentialDecayUI(); });
 	if (webGLBlueDecayRateSlider) webGLBlueDecayRateSlider.addEventListener('input', (e) => { webGLDifferentialDecayRates.b = parseFloat(e.target.value); updateDifferentialDecayUI(); });
+
+	// New UI elements for beam simulation
+	webGLBeamSpeedSlider = document.getElementById("webGLBeamSpeedSlider");
+	webGLBeamSpeedDisplay = document.getElementById("webGLBeamSpeedValue");
+	if (webGLBeamSpeedSlider) {
+		webGLBeamSpeedSlider.value = webGLBeamSpeed.toFixed(0);
+		webGLBeamSpeedSlider.addEventListener('input', (e) => {
+			webGLBeamSpeed = parseFloat(e.target.value);
+			if (webGLBeamSpeedDisplay) webGLBeamSpeedDisplay.textContent = webGLBeamSpeed.toFixed(0);
+		});
+	}
+
+	webGLIntraVectorDecayRateSlider = document.getElementById("webGLIntraVectorDecayRateSlider");
+	webGLIntraVectorDecayRateDisplay = document.getElementById("webGLIntraVectorDecayRateValue");
+	if (webGLIntraVectorDecayRateSlider) {
+		webGLIntraVectorDecayRateSlider.value = webGLIntraVectorDecayRate.toFixed(2);
+		webGLIntraVectorDecayRateSlider.addEventListener('input', (e) => {
+			webGLIntraVectorDecayRate = parseFloat(e.target.value);
+			if (webGLIntraVectorDecayRateDisplay) webGLIntraVectorDecayRateDisplay.textContent = webGLIntraVectorDecayRate.toFixed(2);
+		});
+	}
+
+	webGLAntialiasPixelWidthSlider = document.getElementById("webGLAntialiasPixelWidthSlider");
+	webGLAntialiasPixelWidthDisplay = document.getElementById("webGLAntialiasPixelWidthValue");
+	if (webGLAntialiasPixelWidthSlider) {
+		webGLAntialiasPixelWidthSlider.value = webGLAntialiasPixelWidth.toFixed(2);
+		webGLAntialiasPixelWidthSlider.addEventListener('input', (e) => {
+			webGLAntialiasPixelWidth = parseFloat(e.target.value);
+			if (webGLAntialiasPixelWidthDisplay) webGLAntialiasPixelWidthDisplay.textContent = webGLAntialiasPixelWidth.toFixed(2);
+		});
+	}
 	
 	var webGLSettingsElement = document.getElementById("webglSettings");
 	if (webGLSettingsElement) { // Initially hide WebGL specific settings
