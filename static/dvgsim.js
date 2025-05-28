@@ -8,18 +8,28 @@ var webGLSupported = false;
 
 // WebGL Shader Programs and Locations
 var vectorShaderProgram = null;
-var decayShaderProgram = null;
-var vsPosLocation, vsColorLocation, vsResolutionLocation; // Vector Shader
-var dsPosLocation, dsDecayAmountLocation; // Decay Shader
+var combineDecayShaderProgram = null; // Renamed from decayShaderProgram
+var compositeShaderProgram = null;
+
+var vsPosLocation, vsColorLocation, vsResolutionLocation, vsGlowMultiplierLocation; // Vector Shader
+var cdsPosLocation, cdsPreviousStateTexLocation, cdsCurrentLinesTexLocation, cdsGlobalDecayLocation, cdsDifferentialDecayRatesLocation; // CombineDecay Shader
+var csPosLocation, csCompositeTextureLocation; // Composite Shader
 
 // WebGL Buffers
 var lineVertexBuffer = null;
-var decayQuadBuffer = null;
+var fullscreenQuadBuffer = null; // Renamed from decayQuadBuffer
+
+// WebGL FBOs and Textures for multi-pass rendering
+var lineFBO = null, lineTexture = null;
+var stateFBOs = [], stateTextures = [];
+var currentStateIndex = 0; // Used to ping-pong between state textures
 
 // WebGL specific settings
 var webGLGlowMultiplier = 1.0;
 var webGLGlowDisplay = null;
-var vsGlowMultiplierLocation = null;
+var webGLDifferentialDecayRates = { r: 0.5, g: 1.0, b: 2.5 };
+var webGLRedDecayRateSlider = null, webGLGreenDecayRateSlider = null, webGLBlueDecayRateSlider = null;
+var webGLRedDecayValueDisplay = null, webGLGreenDecayValueDisplay = null, webGLBlueDecayValueDisplay = null;
 
 
 canvasElement.width = window.innerWidth;
@@ -131,17 +141,19 @@ async function initShaderProgram(glContext, vsUrl, fsUrl) {
 }
 
 async function initWebGL() {
-	gl = webGLCanvasElement.getContext("webgl");
+	gl = webGLCanvasElement.getContext("webgl", { preserveDrawingBuffer: false }); // preserveDrawingBuffer might be useful for debugging but generally false for performance
 	if (!gl) {
 		console.error("WebGL not supported, falling back to 2D canvas.");
 		return false;
 	}
 
+	// Load shaders
 	vectorShaderProgram = await initShaderProgram(gl, 'vector_shader.vert', 'vector_shader.frag');
-	decayShaderProgram = await initShaderProgram(gl, 'decay_shader.vert', 'decay_shader.frag');
+	combineDecayShaderProgram = await initShaderProgram(gl, 'fullscreen_quad.vert', 'combine_decay_shader.frag'); // Uses new fullscreen_quad.vert
+	compositeShaderProgram = await initShaderProgram(gl, 'composite_shader.vert', 'composite_shader.frag');
 
-	if (!vectorShaderProgram || !decayShaderProgram) {
-		console.error("Failed to initialize shader programs.");
+	if (!vectorShaderProgram || !combineDecayShaderProgram || !compositeShaderProgram) {
+		console.error("Failed to initialize one or more shader programs.");
 		return false;
 	}
 
@@ -149,24 +161,66 @@ async function initWebGL() {
 	vsPosLocation = gl.getAttribLocation(vectorShaderProgram, 'aVertexPosition');
 	vsColorLocation = gl.getAttribLocation(vectorShaderProgram, 'aVertexColor');
 	vsResolutionLocation = gl.getUniformLocation(vectorShaderProgram, 'uResolution');
-
-	// Decay Shader Locations
-	dsPosLocation = gl.getAttribLocation(decayShaderProgram, 'aPosition');
-	dsDecayAmountLocation = gl.getUniformLocation(decayShaderProgram, 'uDecayAmount');
-
-	// Vector Shader Uniforms
 	vsGlowMultiplierLocation = gl.getUniformLocation(vectorShaderProgram, 'uGlowMultiplier');
+
+	// CombineDecay Shader Locations
+	cdsPosLocation = gl.getAttribLocation(combineDecayShaderProgram, 'aPosition');
+	cdsPreviousStateTexLocation = gl.getUniformLocation(combineDecayShaderProgram, 'uPreviousStateTex');
+	cdsCurrentLinesTexLocation = gl.getUniformLocation(combineDecayShaderProgram, 'uCurrentLinesTex');
+	cdsGlobalDecayLocation = gl.getUniformLocation(combineDecayShaderProgram, 'uGlobalDecay');
+	cdsDifferentialDecayRatesLocation = gl.getUniformLocation(combineDecayShaderProgram, 'uDifferentialDecayRates');
+	
+	// Composite Shader Locations
+	csPosLocation = gl.getAttribLocation(compositeShaderProgram, 'aPosition');
+	csCompositeTextureLocation = gl.getUniformLocation(compositeShaderProgram, 'uCompositeTexture');
 
 	// Buffers
 	lineVertexBuffer = gl.createBuffer();
-	const quadVertices = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
-	decayQuadBuffer = gl.createBuffer();
-	gl.bindBuffer(gl.ARRAY_BUFFER, decayQuadBuffer);
+	const quadVertices = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]); // For a strip: -1,-1, 1,-1, -1,1, 1,1
+	fullscreenQuadBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, fullscreenQuadBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
+
+	// Framebuffers and Textures
+	function createTexture(width, height) {
+		const texture = gl.createTexture();
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+		return texture;
+	}
+
+	function createFBO(texture) {
+		const fbo = gl.createFramebuffer();
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+		return fbo;
+	}
+
+	const canvasWidth = gl.canvas.width;
+	const canvasHeight = gl.canvas.height;
+
+	lineTexture = createTexture(canvasWidth, canvasHeight);
+	lineFBO = createFBO(lineTexture);
+
+	stateTextures[0] = createTexture(canvasWidth, canvasHeight);
+	stateFBOs[0] = createFBO(stateTextures[0]);
+	stateTextures[1] = createTexture(canvasWidth, canvasHeight);
+	stateFBOs[1] = createFBO(stateTextures[1]);
+	
+	// Initialize one of the state textures to black
+	gl.bindFramebuffer(gl.FRAMEBUFFER, stateFBOs[0]);
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
 
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	webGLSupported = true;
-	useWebGLRenderer = true;
+	useWebGLRenderer = true; // Default to WebGL if supported
 	updateRendererToggleButton();
 	return true;
 }
@@ -384,29 +438,23 @@ function glowStroke2D() {
 
 
 function renderWebGLFrame() {
-	if (!gl || HALT_FLAG == 1) return;
+	if (!gl || !webGLSupported) return; // HALT_FLAG check is inside the simulation part now
 
-	gl.clearColor(0.0, 0.0, 0.0, 1.0); // Ensure background is black
+	const sourceStateIndex = currentStateIndex;
+	const targetStateIndex = (currentStateIndex + 1) % 2;
+
+	// --- 1. Line Drawing Pass (to lineFBO / lineTexture) ---
+	gl.bindFramebuffer(gl.FRAMEBUFFER, lineFBO);
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	gl.clearColor(0.0, 0.0, 0.0, 0.0); // Clear to transparent black
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
-	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-
-	// 1. Decay Pass (draw semi-transparent black quad)
-	gl.useProgram(decayShaderProgram);
-	gl.bindBuffer(gl.ARRAY_BUFFER, decayQuadBuffer);
-	gl.vertexAttribPointer(dsPosLocation, 2, gl.FLOAT, false, 0, 0);
-	gl.enableVertexAttribArray(dsPosLocation);
-	gl.uniform1f(dsDecayAmountLocation, pDecay);
-	gl.enable(gl.BLEND);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); // Standard alpha blending for decay
-	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-
-	// 2. Line Pass (additive blending for glow)
 	gl.useProgram(vectorShaderProgram);
+	gl.enable(gl.BLEND);
 	gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // Additive blending for lines
 
 	let vertices = [];
-	let currentProgram = [...program]; // Operate on a copy for this frame if pc can change
+	// let currentProgram = [...program]; // Operate on a copy for this frame if pc can change
 	let currentPC = pc;
 	let currentLastPoint = {...lastPoint};
 	let currentSCALE_FACTOR = SCALE_FACTOR;
@@ -520,7 +568,55 @@ function renderWebGLFrame() {
 			gl.drawArrays(gl.LINES, 0, vertices.length / 6);
 		}
 	}
-	// Restore simulation state for the next actual frame update
+	gl.disable(gl.BLEND);
+	// --- End Line Drawing Pass ---
+
+	// --- 2. Combine & Decay Pass (Read stateTextures[sourceStateIndex] and lineTexture, Write to stateFBOs[targetStateIndex]) ---
+	gl.bindFramebuffer(gl.FRAMEBUFFER, stateFBOs[targetStateIndex]);
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	// No need to clear, we are overwriting the entire target FBO.
+
+	gl.useProgram(combineDecayShaderProgram);
+	
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, stateTextures[sourceStateIndex]);
+	gl.uniform1i(cdsPreviousStateTexLocation, 0);
+
+	gl.activeTexture(gl.TEXTURE1);
+	gl.bindTexture(gl.TEXTURE_2D, lineTexture);
+	gl.uniform1i(cdsCurrentLinesTexLocation, 1);
+
+	gl.uniform1f(cdsGlobalDecayLocation, pDecay);
+	gl.uniform3f(cdsDifferentialDecayRatesLocation, webGLDifferentialDecayRates.r, webGLDifferentialDecayRates.g, webGLDifferentialDecayRates.b);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, fullscreenQuadBuffer);
+	gl.vertexAttribPointer(cdsPosLocation, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(cdsPosLocation);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	// --- End Combine & Decay Pass ---
+
+	// --- 3. Composite to Screen (Read stateTextures[targetStateIndex], Write to canvas) ---
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null); // Bind default framebuffer (the screen)
+	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+	gl.clearColor(0.0, 0.0, 0.0, 1.0); // Clear screen to black
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	gl.useProgram(compositeShaderProgram);
+	gl.activeTexture(gl.TEXTURE0);
+	gl.bindTexture(gl.TEXTURE_2D, stateTextures[targetStateIndex]);
+	gl.uniform1i(csCompositeTextureLocation, 0);
+
+	gl.bindBuffer(gl.ARRAY_BUFFER, fullscreenQuadBuffer);
+	gl.vertexAttribPointer(csPosLocation, 2, gl.FLOAT, false, 0, 0);
+	gl.enableVertexAttribArray(csPosLocation);
+	gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+	// --- End Composite to Screen Pass ---
+
+	// --- 4. Swap state textures for next frame ---
+	currentStateIndex = targetStateIndex;
+
+
+	// Restore simulation state for the next actual frame update (from original line drawing pass)
 	pc = originalFramePC;
 	lastPoint = {...originalFrameLastPoint};
 	SCALE_FACTOR = originalFrameSCALE_FACTOR;
@@ -529,40 +625,41 @@ function renderWebGLFrame() {
 	HALT_FLAG = 0; // Reset for the main simulation logic that advances pc
 
 	// Advance the main simulation pc, lastPoint etc. after generating all draw data for this frame
-	// This is the part that was in the original 2D loop's opsCount < maxOps
-	for (let opsCount = 0; opsCount < maxOps; opsCount++) {
-		if (pc >= program.length || pc < 0) { HALT_FLAG = 1; break; }
-		const thisOp = program[pc];
-		if (!thisOp) { HALT_FLAG = 1; break; }
+	if (HALT_FLAG == 0) { // Only advance if not halted from line drawing sim
+		for (let opsCount = 0; opsCount < maxOps; opsCount++) {
+			if (pc >= program.length || pc < 0) { HALT_FLAG = 1; break; }
+			const thisOp = program[pc];
+			if (!thisOp) { HALT_FLAG = 1; break; }
 
-		if (thisOp.opcode == "SCALE") { SCALE_FACTOR = thisOp.scale; }
-		else if (thisOp.opcode == "CENTER") { lastPoint.x = thisOp.x; lastPoint.y = thisOp.y; }
-		else if (thisOp.opcode == "COLOR") { COLOR = thisOp.color; }
-		else if (thisOp.opcode == "LABS") {
-			lastPoint.x = thisOp.x; lastPoint.y = thisOp.y; SCALE_FACTOR = thisOp.scale;
+			if (thisOp.opcode == "SCALE") { SCALE_FACTOR = thisOp.scale; }
+			else if (thisOp.opcode == "CENTER") { lastPoint.x = thisOp.x; lastPoint.y = thisOp.y; }
+			else if (thisOp.opcode == "COLOR") { COLOR = thisOp.color; }
+			else if (thisOp.opcode == "LABS") {
+				lastPoint.x = thisOp.x; lastPoint.y = thisOp.y; SCALE_FACTOR = thisOp.scale;
+			}
+			else if (thisOp.opcode == "VCTR") {
+				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
+				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
+				if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
+				lastPoint.x += relX; lastPoint.y += relY;
+			}
+			else if (thisOp.opcode == "SVEC") {
+				var relX = thisOp.x << (4 + thisOp.scale); var relY = thisOp.y << (4 + thisOp.scale);
+				if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
+				lastPoint.x += relX; lastPoint.y += relY;
+			} else if (thisOp.opcode == "JMPL") {
+				if (typeof thisOp.target !== 'number' || thisOp.target < 0 || thisOp.target >= program.length) { HALT_FLAG = 1; break; }
+				pc = thisOp.target; continue;
+			} else if (thisOp.opcode == "JSRL") {
+				if (typeof thisOp.target !== 'number' || thisOp.target < 0 || thisOp.target >= program.length) { HALT_FLAG = 1; break; }
+				pc++; stack.push(pc); pc = thisOp.target; continue;
+			} else if (thisOp.opcode == "RTSL") {
+				if (stack.length > 0) { pc = stack.pop(); } else { HALT_FLAG = 1; break; }
+				continue;
+			} else if (thisOp.opcode == "HALT") { HALT_FLAG = 1; break; } // Break from opsCount loop
+			pc++;
+			if (pc >= program.length) { HALT_FLAG = 1; break; } // Break from opsCount loop
 		}
-		else if (thisOp.opcode == "VCTR") {
-			var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
-			var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
-			if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
-			lastPoint.x += relX; lastPoint.y += relY;
-		}
-		else if (thisOp.opcode == "SVEC") {
-			var relX = thisOp.x << (4 + thisOp.scale); var relY = thisOp.y << (4 + thisOp.scale);
-			if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
-			lastPoint.x += relX; lastPoint.y += relY;
-		} else if (thisOp.opcode == "JMPL") {
-			if (typeof thisOp.target !== 'number' || thisOp.target < 0 || thisOp.target >= program.length) { HALT_FLAG = 1; break; }
-			pc = thisOp.target; continue;
-		} else if (thisOp.opcode == "JSRL") {
-			if (typeof thisOp.target !== 'number' || thisOp.target < 0 || thisOp.target >= program.length) { HALT_FLAG = 1; break; }
-			pc++; stack.push(pc); pc = thisOp.target; continue;
-		} else if (thisOp.opcode == "RTSL") {
-			if (stack.length > 0) { pc = stack.pop(); } else { HALT_FLAG = 1; break; }
-			continue;
-		} else if (thisOp.opcode == "HALT") { HALT_FLAG = 1; return; } // Return if HALT
-		pc++;
-		if (pc >= program.length) { HALT_FLAG = 1; return; } // Return if end of program
 	}
 }
 
@@ -662,9 +759,31 @@ function keyHandle(evt) {
 				if (webGLGlowMultiplier < 0.0) webGLGlowMultiplier = 0.0;
 				if (webGLGlowDisplay) webGLGlowDisplay.innerHTML = webGLGlowMultiplier.toFixed(2);
 			}
+		} else if (evt.shiftKey && useWebGLRenderer && webGLSupported) { // Ctrl + Shift + Key for decay rates
+			evt.preventDefault();
+			let updated = false;
+			switch(evt.key.toUpperCase()) {
+				case 'R': webGLDifferentialDecayRates.r = Math.max(0.1, webGLDifferentialDecayRates.r - 0.1); updated = true; break;
+				case 'F': webGLDifferentialDecayRates.r = Math.min(5.0, webGLDifferentialDecayRates.r + 0.1); updated = true; break;
+				case 'G': webGLDifferentialDecayRates.g = Math.max(0.1, webGLDifferentialDecayRates.g - 0.1); updated = true; break;
+				case 'H': webGLDifferentialDecayRates.g = Math.min(5.0, webGLDifferentialDecayRates.g + 0.1); updated = true; break;
+				case 'B': webGLDifferentialDecayRates.b = Math.max(0.1, webGLDifferentialDecayRates.b - 0.1); updated = true; break;
+				case 'N': webGLDifferentialDecayRates.b = Math.min(5.0, webGLDifferentialDecayRates.b + 0.1); updated = true; break;
+			}
+			if (updated) updateDifferentialDecayUI();
 		}
 	}
 }
+
+function updateDifferentialDecayUI() {
+	if (webGLRedDecayRateSlider) webGLRedDecayRateSlider.value = webGLDifferentialDecayRates.r.toFixed(1);
+	if (webGLRedDecayValueDisplay) webGLRedDecayValueDisplay.textContent = webGLDifferentialDecayRates.r.toFixed(1);
+	if (webGLGreenDecayRateSlider) webGLGreenDecayRateSlider.value = webGLDifferentialDecayRates.g.toFixed(1);
+	if (webGLGreenDecayValueDisplay) webGLGreenDecayValueDisplay.textContent = webGLDifferentialDecayRates.g.toFixed(1);
+	if (webGLBlueDecayRateSlider) webGLBlueDecayRateSlider.value = webGLDifferentialDecayRates.b.toFixed(1);
+	if (webGLBlueDecayValueDisplay) webGLBlueDecayValueDisplay.textContent = webGLDifferentialDecayRates.b.toFixed(1);
+}
+
 
 window.addEventListener("mousemove", mouseHandle, true);
 window.addEventListener("keydown", keyHandle, true);
@@ -689,12 +808,24 @@ window.addEventListener("load", async () => {
 	DVG = canvasElement.getContext("2d");
 	webGLCanvasElement = document.getElementById("webglCanvas");
 	rendererTogglerButton = document.getElementById("rendererToggler");
-	webGLGlowDisplay = document.getElementById("webGLGlowValue"); // Corrected ID
+	webGLGlowDisplay = document.getElementById("webGLGlowValue");
+	
+	webGLRedDecayRateSlider = document.getElementById("redDecayRate");
+	webGLGreenDecayRateSlider = document.getElementById("greenDecayRate");
+	webGLBlueDecayRateSlider = document.getElementById("blueDecayRate");
+	webGLRedDecayValueDisplay = document.getElementById("redDecayValue");
+	webGLGreenDecayValueDisplay = document.getElementById("greenDecayValue");
+	webGLBlueDecayValueDisplay = document.getElementById("blueDecayValue");
+
+	if (webGLRedDecayRateSlider) webGLRedDecayRateSlider.addEventListener('input', (e) => { webGLDifferentialDecayRates.r = parseFloat(e.target.value); updateDifferentialDecayUI(); });
+	if (webGLGreenDecayRateSlider) webGLGreenDecayRateSlider.addEventListener('input', (e) => { webGLDifferentialDecayRates.g = parseFloat(e.target.value); updateDifferentialDecayUI(); });
+	if (webGLBlueDecayRateSlider) webGLBlueDecayRateSlider.addEventListener('input', (e) => { webGLDifferentialDecayRates.b = parseFloat(e.target.value); updateDifferentialDecayUI(); });
 	
 	var webGLSettingsElement = document.getElementById("webglSettings");
 	if (webGLSettingsElement) { // Initially hide WebGL specific settings
 		webGLSettingsElement.style.display = 'none';
 	}
+	updateDifferentialDecayUI(); // Set initial values
 
 
 	if (canvasElement) {

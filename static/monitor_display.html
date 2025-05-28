@@ -334,7 +334,13 @@ RTSL`  ;
         Vectors Per Second: <span id="vps">200</span> ( Ctrl + [<kbd><</kbd>] / [<kbd>></kbd>] to change )<br>
         Phosphor Decay: <span id="decay">-15%/frame</span> ( Ctrl + [<kbd>[</kbd>] / [<kbd>]</kbd>] to change )<br>
         <button id="rendererToggler" onclick="toggleRenderer()">Toggle Renderer (Current: 2D)</button><br>
-        <span id="webglSettings" style="display: none;">WebGL Glow Multiplier: <span id="webGLGlowValue">1.00</span> ( Ctrl + [<kbd>PgUp</kbd>] / [<kbd>PgDn</kbd>] to change )<br></span>
+        <div id="webglSettings" style="display: none;">
+          WebGL Glow Multiplier: <span id="webGLGlowValue">1.00</span> ( Ctrl + [<kbd>PgUp</kbd>] / [<kbd>PgDn</kbd>] to change )<br>
+          Differential Decay Rates (Ctrl + Shift + Keys):<br>
+          Red: <input type="range" id="redDecayRate" min="0.1" max="5" step="0.1" value="0.5"> <span id="redDecayValue">0.5</span> (R/F)<br>
+          Green: <input type="range" id="greenDecayRate" min="0.1" max="5" step="0.1" value="1.0"> <span id="greenDecayValue">1.0</span> (G/H)<br>
+          Blue: <input type="range" id="blueDecayRate" min="0.1" max="5" step="0.1" value="2.5"> <span id="blueDecayValue">2.5</span> (B/N)<br>
+        </div>
       </div>
       <div><b>Program</b> <small>( Ctrl + Enter to assemble & run )</small></div>
       <textarea id="progEditor" spellcheck="false"></textarea>
