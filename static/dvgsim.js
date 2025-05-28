@@ -6,6 +6,84 @@ var gl = null;
 var useWebGLRenderer = false;
 var webGLSupported = false;
 
+var globalLineTexInternalFormat = null; // To store determined format for lineTexture
+var globalLineTexType = null;         // To store determined type for lineTexture
+
+// --- WebGL Helper Functions ---
+function createTextureHelper(glContext, width, height, internalFormat, format, type) {
+	const texture = glContext.createTexture();
+	glContext.bindTexture(glContext.TEXTURE_2D, texture);
+	glContext.texImage2D(glContext.TEXTURE_2D, 0, internalFormat, width, height, 0, format, type, null);
+	glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MIN_FILTER, glContext.LINEAR);
+	glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_MAG_FILTER, glContext.LINEAR);
+	glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_S, glContext.CLAMP_TO_EDGE);
+	glContext.texParameteri(glContext.TEXTURE_2D, glContext.TEXTURE_WRAP_T, glContext.CLAMP_TO_EDGE);
+	return texture;
+}
+
+function createFBOHelper(glContext, texture) {
+	const fbo = glContext.createFramebuffer();
+	glContext.bindFramebuffer(glContext.FRAMEBUFFER, fbo);
+	glContext.framebufferTexture2D(glContext.FRAMEBUFFER, glContext.COLOR_ATTACHMENT0, glContext.TEXTURE_2D, texture, 0);
+	
+	const status = glContext.checkFramebufferStatus(glContext.FRAMEBUFFER);
+	if (status !== glContext.FRAMEBUFFER_COMPLETE) {
+		console.error("Framebuffer incomplete: " + status.toString() + " (Texture associated: " + texture + ")");
+		glContext.bindFramebuffer(glContext.FRAMEBUFFER, null); // Unbind before deleting
+		glContext.deleteFramebuffer(fbo);
+		return null;
+	}
+	glContext.bindFramebuffer(glContext.FRAMEBUFFER, null); // Unbind FBO
+	return fbo;
+}
+
+function recreateWebGLResources(width, height) {
+	if (!gl) {
+		console.error("recreateWebGLResources called but gl context is null.");
+		return false;
+	}
+	if (globalLineTexInternalFormat === null || globalLineTexType === null) {
+		console.error("recreateWebGLResources called before line texture formats are determined.");
+		return false;
+	}
+
+	// Delete old textures and FBOs if they exist
+	if (lineTexture) gl.deleteTexture(lineTexture);
+	if (lineFBO) gl.deleteFramebuffer(lineFBO);
+	if (stateTextures[0]) gl.deleteTexture(stateTextures[0]);
+	if (stateFBOs[0]) gl.deleteFramebuffer(stateFBOs[0]);
+	if (stateTextures[1]) gl.deleteTexture(stateTextures[1]);
+	if (stateFBOs[1]) gl.deleteFramebuffer(stateFBOs[1]);
+
+	// Recreate line texture and FBO
+	lineTexture = createTextureHelper(gl, width, height, globalLineTexInternalFormat, gl.RGBA, globalLineTexType);
+	if (!lineTexture) { console.error("Failed to recreate lineTexture."); return false; }
+	lineFBO = createFBOHelper(gl, lineTexture);
+	if (!lineFBO) { console.error("Failed to recreate lineFBO."); return false; }
+
+	// Recreate state textures and FBOs (using standard RGBA/UNSIGNED_BYTE)
+	stateTextures[0] = createTextureHelper(gl, width, height, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE);
+	if (!stateTextures[0]) { console.error("Failed to recreate stateTextures[0]."); return false; }
+	stateFBOs[0] = createFBOHelper(gl, stateTextures[0]);
+	if (!stateFBOs[0]) { console.error("Failed to recreate stateFBOs[0]."); return false; }
+
+	stateTextures[1] = createTextureHelper(gl, width, height, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE);
+	if (!stateTextures[1]) { console.error("Failed to recreate stateTextures[1]."); return false; }
+	stateFBOs[1] = createFBOHelper(gl, stateTextures[1]);
+	if (!stateFBOs[1]) { console.error("Failed to recreate stateFBOs[1]."); return false; }
+
+	// Initialize one of the state textures to black
+	gl.bindFramebuffer(gl.FRAMEBUFFER, stateFBOs[0]);
+	gl.clearColor(0.0, 0.0, 0.0, 1.0);
+	gl.clear(gl.COLOR_BUFFER_BIT);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+	currentStateIndex = 0; // Reset ping-pong state
+
+	console.log(`WebGL resources recreated for ${width}x${height}.`);
+	return true;
+}
+
 // WebGL Shader Programs and Locations
 var vectorShaderProgram = null;
 var combineDecayShaderProgram = null; // Renamed from decayShaderProgram
@@ -224,73 +302,62 @@ async function initWebGL() {
 	gl.bindBuffer(gl.ARRAY_BUFFER, fullscreenQuadBuffer);
 	gl.bufferData(gl.ARRAY_BUFFER, quadVertices, gl.STATIC_DRAW);
 
-	// Framebuffers and Textures
-	function createTexture(width, height) {
-		const texture = gl.createTexture();
-		gl.bindTexture(gl.TEXTURE_2D, texture);
-		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-		return texture;
+	// Determine texture formats for lineTexture (once)
+	globalLineTexInternalFormat = gl.RGBA; // Default
+	globalLineTexType = gl.UNSIGNED_BYTE; // Default
+	
+	if (gl instanceof WebGL2RenderingContext) {
+		const gl2 = gl;
+		// Try to use RGBA16F, check if it's a renderable format
+		const tempTex_WebGL2 = gl2.createTexture(); // Use a unique name for temp texture
+		gl2.bindTexture(gl2.TEXTURE_2D, tempTex_WebGL2);
+		try {
+			gl2.texImage2D(gl2.TEXTURE_2D, 0, gl2.RGBA16F, 1, 1, 0, gl2.RGBA, gl2.FLOAT, null);
+			const tempFBO_WebGL2 = gl2.createFramebuffer(); // Unique name for temp FBO
+			gl2.bindFramebuffer(gl2.FRAMEBUFFER, tempFBO_WebGL2);
+			gl2.framebufferTexture2D(gl2.FRAMEBUFFER, gl2.COLOR_ATTACHMENT0, gl2.TEXTURE_2D, tempTex_WebGL2, 0);
+			if (gl2.checkFramebufferStatus(gl2.FRAMEBUFFER) === gl2.FRAMEBUFFER_COMPLETE) {
+				globalLineTexInternalFormat = gl2.RGBA16F;
+				globalLineTexType = gl2.FLOAT;
+				console.log("Using WebGL2 float texture for lines (RGBA16F).");
+			} else {
+				console.log("WebGL2 context, but RGBA16F is not renderable as FBO attachment. Falling back.");
+			}
+			gl2.bindFramebuffer(gl2.FRAMEBUFFER, null);
+			gl2.deleteFramebuffer(tempFBO_WebGL2);
+		} catch (e) {
+			console.log("WebGL2 context, but texImage2D with RGBA16F/FLOAT failed. Falling back.", e);
+		}
+		gl2.deleteTexture(tempTex_WebGL2);
 	}
-
-	function createFBO(texture) {
-		const fbo = gl.createFramebuffer();
-		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-		gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-		return fbo;
-	}
-
-	const canvasWidth = gl.canvas.width;
-	const canvasHeight = gl.canvas.height;
-
-	// Attempt to use float texture for lineTexture for better glow accumulation
-	let lineTexInternalFormat = gl.RGBA;
-	let lineTexType = gl.UNSIGNED_BYTE;
-	const isWebGL2 = !!gl.texStorage2D; // A WebGL2 function
-
-	if (isWebGL2) {
-		lineTexInternalFormat = gl.RGBA16F; // Or RGBA32F for higher precision
-		lineTexType = gl.FLOAT;
-		console.log("Using WebGL2 float texture for lines (RGBA16F).");
-	} else {
+	
+	if (globalLineTexType !== gl.FLOAT) { // If not set to FLOAT by WebGL2 logic, try WebGL1 float extensions
 		const floatTextureExt = gl.getExtension('OES_texture_float');
 		const floatTextureLinearExt = gl.getExtension('OES_texture_float_linear');
 		if (floatTextureExt && floatTextureLinearExt) {
-			lineTexType = gl.FLOAT;
-			// Internal format remains gl.RGBA for WebGL1 with OES_texture_float
-			console.log("Using WebGL1 OES_texture_float for lines.");
+			globalLineTexInternalFormat = gl.RGBA;
+			globalLineTexType = gl.FLOAT;
+			console.log("Using WebGL1 OES_texture_float (with linear filtering) for lines.");
 		} else {
-			console.log("Float textures not supported for lines, using UNSIGNED_BYTE.");
+			console.log("Float textures (with linear filtering) not supported for lines, using UNSIGNED_BYTE.");
+			// Defaults (gl.RGBA, gl.UNSIGNED_BYTE) are already set for globalLineTexInternalFormat/Type
 		}
 	}
-	
-	lineTexture = gl.createTexture();
-	gl.bindTexture(gl.TEXTURE_2D, lineTexture);
-	gl.texImage2D(gl.TEXTURE_2D, 0, lineTexInternalFormat, canvasWidth, canvasHeight, 0, gl.RGBA, lineTexType, null);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-	lineFBO = createFBO(lineTexture);
+
+	// Framebuffers and Textures will be created by recreateWebGLResources
+	const canvasWidth = gl.canvas.width;
+	const canvasHeight = gl.canvas.height;
+	if (!recreateWebGLResources(canvasWidth, canvasHeight)) {
+		console.error("Failed to create initial WebGL resources.");
+		// Potentially set webGLSupported to false or handle error more gracefully
+		webGLSupported = false;
+		useWebGLRenderer = false;
+		updateRendererToggleButton();
+		return false;
+	}
 
 	maxGlLineWidthRange = gl.getParameter(gl.ALIASED_LINE_WIDTH_RANGE);
 	console.log("Supported line width range: ", maxGlLineWidthRange[0], "to", maxGlLineWidthRange[1]);
-
-
-	stateTextures[0] = createTexture(canvasWidth, canvasHeight);
-	stateFBOs[0] = createFBO(stateTextures[0]);
-	stateTextures[1] = createTexture(canvasWidth, canvasHeight);
-	stateFBOs[1] = createFBO(stateTextures[1]);
-	
-	// Initialize one of the state textures to black
-	gl.bindFramebuffer(gl.FRAMEBUFFER, stateFBOs[0]);
-	gl.clearColor(0.0, 0.0, 0.0, 1.0);
-	gl.clear(gl.COLOR_BUFFER_BIT);
-	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-
 
 	gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 	webGLSupported = true;
@@ -955,11 +1022,18 @@ window.addEventListener("resize", () => {
 	canvasElement.height = window.innerHeight;
 	webGLCanvasElement.width = window.innerWidth;
 	webGLCanvasElement.height = window.innerHeight;
-	if (gl) {
+
+	if (gl && useWebGLRenderer && webGLSupported) { // Ensure WebGL is initialized and active
 		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+		if (!recreateWebGLResources(gl.canvas.width, gl.canvas.height)) {
+			console.error("Failed to resize WebGL resources. Display might be corrupted.");
+			// Optionally, could disable WebGL renderer or show an error to the user
+			// For now, just log and continue; the renderer might become unstable.
+			// To be safer, one might set webGLSupported = false and toggle to 2D.
+		}
 	}
 	// Reset lastPoint to center on resize
-	const currentCanvas = useWebGLRenderer ? webGLCanvasElement : canvasElement;
+	const currentCanvas = useWebGLRenderer && webGLSupported ? webGLCanvasElement : canvasElement;
 	lastPoint.x = currentCanvas.width / 2;
 	lastPoint.y = currentCanvas.height / 2;
 });
