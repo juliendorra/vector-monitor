@@ -361,11 +361,11 @@ function checkCollisions() {
             if (!e.active) return;
 
             // AABB collision detection for center-based positioning
-            // Both projectile and enemy coordinates represent their centers
+            // Enemy coordinates represent centers, but projectile y is the top position
             const projectileLeft = p.x - p.width / 2;
             const projectileRight = p.x + p.width / 2;
-            const projectileTop = p.y - p.height / 2;
-            const projectileBottom = p.y + p.height / 2;
+            const projectileTop = p.y;
+            const projectileBottom = p.y + p.height;
 
             const enemyLeft = e.x - e.width / 2;
             const enemyRight = e.x + e.width / 2;
