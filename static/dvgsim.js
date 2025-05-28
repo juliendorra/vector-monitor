@@ -493,6 +493,48 @@ function setupConnectionHandler() {
 				vpsDisplaySpan.innerHTML = maxOps * indicativeFrameRate;
 			}
 
+			// Process WebGL shader parameters from metadata
+			if (useWebGLRenderer && webGLSupported) {
+				if (receivedMetadata.hasOwnProperty('webGLGlowMultiplier') && typeof receivedMetadata.webGLGlowMultiplier === 'number') {
+					webGLGlowMultiplier = Math.max(0.0, Math.min(5.0, receivedMetadata.webGLGlowMultiplier));
+					if (webGLGlowMultiplierSlider) webGLGlowMultiplierSlider.value = webGLGlowMultiplier.toFixed(2);
+					if (webGLGlowDisplay) webGLGlowDisplay.textContent = webGLGlowMultiplier.toFixed(2);
+				}
+				if (receivedMetadata.hasOwnProperty('webGLLineWidthMultiplier') && typeof receivedMetadata.webGLLineWidthMultiplier === 'number') {
+					webGLLineWidthMultiplier = Math.max(0.1, Math.min(10.0, receivedMetadata.webGLLineWidthMultiplier));
+					if (webGLLineWidthMultiplierSlider) webGLLineWidthMultiplierSlider.value = webGLLineWidthMultiplier.toFixed(2);
+					if (webGLLineWidthDisplay) webGLLineWidthDisplay.textContent = webGLLineWidthMultiplier.toFixed(2);
+				}
+				if (receivedMetadata.hasOwnProperty('webGLDifferentialDecayRates') && typeof receivedMetadata.webGLDifferentialDecayRates === 'object') {
+					const rates = receivedMetadata.webGLDifferentialDecayRates;
+					if (rates.hasOwnProperty('r') && typeof rates.r === 'number') {
+						webGLDifferentialDecayRates.r = Math.max(0.1, Math.min(5.0, rates.r));
+					}
+					if (rates.hasOwnProperty('g') && typeof rates.g === 'number') {
+						webGLDifferentialDecayRates.g = Math.max(0.1, Math.min(5.0, rates.g));
+					}
+					if (rates.hasOwnProperty('b') && typeof rates.b === 'number') {
+						webGLDifferentialDecayRates.b = Math.max(0.1, Math.min(5.0, rates.b));
+					}
+					updateDifferentialDecayUI();
+				}
+				if (receivedMetadata.hasOwnProperty('webGLBeamSpeed') && typeof receivedMetadata.webGLBeamSpeed === 'number') {
+					webGLBeamSpeed = Math.max(100, Math.min(10000, receivedMetadata.webGLBeamSpeed));
+					if (webGLBeamSpeedSlider) webGLBeamSpeedSlider.value = webGLBeamSpeed.toFixed(0);
+					if (webGLBeamSpeedDisplay) webGLBeamSpeedDisplay.textContent = webGLBeamSpeed.toFixed(0);
+				}
+				if (receivedMetadata.hasOwnProperty('webGLIntraVectorDecayRate') && typeof receivedMetadata.webGLIntraVectorDecayRate === 'number') {
+					webGLIntraVectorDecayRate = Math.max(0.0, Math.min(50.0, receivedMetadata.webGLIntraVectorDecayRate));
+					if (webGLIntraVectorDecayRateSlider) webGLIntraVectorDecayRateSlider.value = webGLIntraVectorDecayRate.toFixed(2);
+					if (webGLIntraVectorDecayRateDisplay) webGLIntraVectorDecayRateDisplay.textContent = webGLIntraVectorDecayRate.toFixed(2);
+				}
+				if (receivedMetadata.hasOwnProperty('webGLAntialiasPixelWidth') && typeof receivedMetadata.webGLAntialiasPixelWidth === 'number') {
+					webGLAntialiasPixelWidth = Math.max(0.1, Math.min(5.0, receivedMetadata.webGLAntialiasPixelWidth));
+					if (webGLAntialiasPixelWidthSlider) webGLAntialiasPixelWidthSlider.value = webGLAntialiasPixelWidth.toFixed(2);
+					if (webGLAntialiasPixelWidthDisplay) webGLAntialiasPixelWidthDisplay.textContent = webGLAntialiasPixelWidth.toFixed(2);
+				}
+			}
+
 			pc = 0;
 			HALT_FLAG = 0;
 			lastIntensity = 8;

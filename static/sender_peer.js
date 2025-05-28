@@ -33,6 +33,24 @@ window.addEventListener('load', () => {
     const openMonitorButton = document.getElementById('openMonitorButton');
     const dvgExamplesSelect = document.getElementById('dvgExamples'); // Get the select element
 
+    // WebGL Shader Control Elements
+    const webGLGlowMultiplierSlider = document.getElementById('webGLGlowMultiplier');
+    const webGLGlowMultiplierValueSpan = document.getElementById('webGLGlowMultiplierValue');
+    const webGLLineWidthMultiplierSlider = document.getElementById('webGLLineWidthMultiplier');
+    const webGLLineWidthMultiplierValueSpan = document.getElementById('webGLLineWidthMultiplierValue');
+    const redDecayRateSlider = document.getElementById('redDecayRate');
+    const redDecayValueSpan = document.getElementById('redDecayValue');
+    const greenDecayRateSlider = document.getElementById('greenDecayRate');
+    const greenDecayValueSpan = document.getElementById('greenDecayValue');
+    const blueDecayRateSlider = document.getElementById('blueDecayRate');
+    const blueDecayValueSpan = document.getElementById('blueDecayValue');
+    const webGLBeamSpeedSlider = document.getElementById('webGLBeamSpeed');
+    const webGLBeamSpeedValueSpan = document.getElementById('webGLBeamSpeedValue');
+    const webGLIntraVectorDecayRateSlider = document.getElementById('webGLIntraVectorDecayRate');
+    const webGLIntraVectorDecayRateValueSpan = document.getElementById('webGLIntraVectorDecayRateValue');
+    const webGLAntialiasPixelWidthSlider = document.getElementById('webGLAntialiasPixelWidth');
+    const webGLAntialiasPixelWidthValueSpan = document.getElementById('webGLAntialiasPixelWidthValue');
+
     let peer = null;
     let currentConnection = null;
     let editor = null;
@@ -301,6 +319,25 @@ JMPL START
         }
     }
 
+    // Initialize WebGL control sliders and their display values
+    function setupSliderWithValueDisplay(slider, displaySpan, toFixedDigits = 2) {
+        if (slider && displaySpan) {
+            displaySpan.textContent = parseFloat(slider.value).toFixed(toFixedDigits);
+            slider.addEventListener('input', () => {
+                displaySpan.textContent = parseFloat(slider.value).toFixed(toFixedDigits);
+            });
+        }
+    }
+
+    setupSliderWithValueDisplay(webGLGlowMultiplierSlider, webGLGlowMultiplierValueSpan, 2);
+    setupSliderWithValueDisplay(webGLLineWidthMultiplierSlider, webGLLineWidthMultiplierValueSpan, 2);
+    setupSliderWithValueDisplay(redDecayRateSlider, redDecayValueSpan, 1);
+    setupSliderWithValueDisplay(greenDecayRateSlider, greenDecayValueSpan, 1);
+    setupSliderWithValueDisplay(blueDecayRateSlider, blueDecayValueSpan, 1);
+    setupSliderWithValueDisplay(webGLBeamSpeedSlider, webGLBeamSpeedValueSpan, 0);
+    setupSliderWithValueDisplay(webGLIntraVectorDecayRateSlider, webGLIntraVectorDecayRateValueSpan, 2);
+    setupSliderWithValueDisplay(webGLAntialiasPixelWidthSlider, webGLAntialiasPixelWidthValueSpan, 2);
+
 
     function initializeSenderPeer() { /* ... existing peer init logic ... */
         peer = new Peer();
@@ -350,6 +387,20 @@ JMPL START
         const desiredVpsValue = desiredVpsInput.value ? parseInt(desiredVpsInput.value) : null;
         const payload = { dvgProgramText: dvgProgramText, metadata: {} };
         if (desiredVpsValue && typeof desiredVpsValue === 'number' && desiredVpsValue > 0) { payload.metadata.vps = desiredVpsValue; }
+
+        // Populate WebGL shader parameters into metadata
+        if (webGLGlowMultiplierSlider) payload.metadata.webGLGlowMultiplier = parseFloat(webGLGlowMultiplierSlider.value);
+        if (webGLLineWidthMultiplierSlider) payload.metadata.webGLLineWidthMultiplier = parseFloat(webGLLineWidthMultiplierSlider.value);
+        
+        payload.metadata.webGLDifferentialDecayRates = {
+            r: redDecayRateSlider ? parseFloat(redDecayRateSlider.value) : 0.5, // Default if element not found
+            g: greenDecayRateSlider ? parseFloat(greenDecayRateSlider.value) : 1.0,
+            b: blueDecayRateSlider ? parseFloat(blueDecayRateSlider.value) : 2.5
+        };
+        
+        if (webGLBeamSpeedSlider) payload.metadata.webGLBeamSpeed = parseFloat(webGLBeamSpeedSlider.value);
+        if (webGLIntraVectorDecayRateSlider) payload.metadata.webGLIntraVectorDecayRate = parseFloat(webGLIntraVectorDecayRateSlider.value);
+        if (webGLAntialiasPixelWidthSlider) payload.metadata.webGLAntialiasPixelWidth = parseFloat(webGLAntialiasPixelWidthSlider.value);
 
         senderStatusDiv.textContent = `Status: Attempting to connect to ${targetPeerId}...`;
         if (currentConnection) currentConnection.close();

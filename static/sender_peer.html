@@ -112,6 +112,42 @@
         <button type="button" id="openMonitorButton" style="margin-left: 10px; padding: 10px 15px;">Open Monitor</button>
 
         <div id="senderStatus">Status: Idle</div>
+
+        <div id="webglControlsContainer" style="margin-top: 20px; padding-top:15px; border-top: 1px solid #eee;">
+            <h3>WebGL Shader Controls (Optional)</h3>
+            <div>
+                <label for="webGLGlowMultiplier">WebGL Glow Multiplier: <span id="webGLGlowMultiplierValue">1.00</span></label>
+                <input type="range" id="webGLGlowMultiplier" min="0.0" max="5.0" step="0.1" value="1.0" style="width: 95%;">
+            </div>
+            <div>
+                <label for="webGLLineWidthMultiplier">WebGL Line Width Multiplier: <span id="webGLLineWidthMultiplierValue">1.00</span></label>
+                <input type="range" id="webGLLineWidthMultiplier" min="0.1" max="10.0" step="0.1" value="1.0" style="width: 95%;">
+            </div>
+            <div style="margin-top:10px;">
+                <label>Differential Decay Rates:</label>
+                <div>
+                    Red: <input type="range" id="redDecayRate" min="0.1" max="5.0" step="0.1" value="0.5" style="width: 80%;"> <span id="redDecayValue">0.5</span>
+                </div>
+                <div>
+                    Green: <input type="range" id="greenDecayRate" min="0.1" max="5.0" step="0.1" value="1.0" style="width: 80%;"> <span id="greenDecayValue">1.0</span>
+                </div>
+                <div>
+                    Blue: <input type="range" id="blueDecayRate" min="0.1" max="5.0" step="0.1" value="2.5" style="width: 80%;"> <span id="blueDecayValue">2.5</span>
+                </div>
+            </div>
+            <div style="margin-top:10px;">
+                <label for="webGLBeamSpeed">Beam Speed (px/sec): <span id="webGLBeamSpeedValue">1000</span></label>
+                <input type="range" id="webGLBeamSpeed" min="100" max="10000" step="100" value="1000" style="width: 95%;">
+            </div>
+            <div>
+                <label for="webGLIntraVectorDecayRate">Intra-Vector Decay: <span id="webGLIntraVectorDecayRateValue">5.00</span></label>
+                <input type="range" id="webGLIntraVectorDecayRate" min="0.0" max="50.0" step="0.1" value="5.0" style="width: 95%;">
+            </div>
+            <div>
+                <label for="webGLAntialiasPixelWidth">Antialias Width (px): <span id="webGLAntialiasPixelWidthValue">1.50</span></label>
+                <input type="range" id="webGLAntialiasPixelWidth" min="0.1" max="5.0" step="0.1" value="1.5" style="width: 95%;">
+            </div>
+        </div>
     </div>
 
     <script type="module" src="sender_peer.js"></script>
