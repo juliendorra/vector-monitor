@@ -6,9 +6,14 @@ export const GAME_HEIGHT = 600; // Assumed virtual height for game logic
 // --- BEGIN DIAGNOSTIC LOGGING ---
 console.log(`[game.js] Initial GAME_WIDTH: ${GAME_WIDTH}, GAME_HEIGHT: ${GAME_HEIGHT}`);
 // --- END DIAGNOSTIC LOGGING ---
-const PLAYER_SPEED = 5;
+const MAX_PLAYER_SPEED = 7; // Player's maximum horizontal speed
+const PLAYER_ACCELERATION = 0.5; // How quickly the player's speed changes
+const PLAYER_FRICTION = 0.08; // Rate at which player slows down (e.g., 0.08 means 8% speed reduction per frame when not accelerating)
+
+const BASE_ENEMY_SPEED = 2; // Base speed for enemies moving downwards
+const ENEMY_SPEED_VARIATION = 1; // Enemies will move at BASE_ENEMY_SPEED +/- ENEMY_SPEED_VARIATION (randomly)
+
 const PROJECTILE_SPEED = 7;
-const ENEMY_SPEED = 2;
 export const PLAYER_SIZE = 30; // Used for drawing and simple collision
 export const PROJECTILE_LENGTH = 20;
 export const ENEMY_SIZE = 30;
@@ -18,6 +23,7 @@ const MAX_PROJECTILES = 5;
 let player = {
     x: GAME_WIDTH / 2,
     y: GAME_HEIGHT - 50,
+    dx: 0, // Player's current horizontal velocity
     width: PLAYER_SIZE, // For collision
     height: PLAYER_SIZE, // For collision
     score: 0,
@@ -91,12 +97,42 @@ export function restartGame() {
 export function updateGame(input) {
     if (gameState !== 'playing') return;
 
-    // Player movement
-    if (input.isLeftArrowDown() && player.x > player.width / 2) {
-        player.x -= PLAYER_SPEED;
+    // Player movement with acceleration and friction
+    let isAccelerating = false;
+    if (input.isLeftArrowDown()) {
+        player.dx -= PLAYER_ACCELERATION;
+        isAccelerating = true;
     }
-    if (input.isRightArrowDown() && player.x < GAME_WIDTH - player.width / 2) {
-        player.x += PLAYER_SPEED;
+    if (input.isRightArrowDown()) {
+        player.dx += PLAYER_ACCELERATION;
+        isAccelerating = true;
+    }
+
+    // Apply friction if not actively accelerating (i.e., no movement keys pressed or keys conflict)
+    if (!isAccelerating) {
+        player.dx *= (1 - PLAYER_FRICTION);
+        // If speed is very low, stop the player to prevent endless small movements and ensure dx becomes exactly 0
+        if (Math.abs(player.dx) < 0.1) {
+            player.dx = 0;
+        }
+    }
+
+    // Clamp player speed to MAX_PLAYER_SPEED
+    player.dx = Math.max(-MAX_PLAYER_SPEED, Math.min(MAX_PLAYER_SPEED, player.dx));
+
+    // Update player position based on velocity
+    player.x += player.dx;
+
+    // Boundary checks for player - stop and reset velocity if hitting walls
+    // Player's x is its center. Player's visual width is player.width.
+    const halfPlayerWidth = player.width / 2;
+    if (player.x - halfPlayerWidth < 0) { // Hit left wall
+        player.x = halfPlayerWidth;
+        player.dx = 0; // Stop at boundary
+    }
+    if (player.x + halfPlayerWidth > GAME_WIDTH) { // Hit right wall
+        player.x = GAME_WIDTH - halfPlayerWidth;
+        player.dx = 0; // Stop at boundary
     }
 
     // Player shooting
@@ -133,7 +169,7 @@ export function updateGame(input) {
     // Update enemies
     enemies.forEach(e => {
         if (e.active) {
-            e.y += ENEMY_SPEED; // Simple downward movement
+            e.y += e.speed; // Use individual enemy speed for downward movement
             if (e.y > GAME_HEIGHT + e.height / 2) {
                 // Enemy reached bottom
                 e.active = false;
@@ -177,6 +213,10 @@ function spawnProjectile(x, y) {
 }
 
 function spawnEnemy(x, y, type, color, intensity) {
+    // Assign a varied speed to each enemy
+    const speedVariation = (Math.random() * 2 - 1) * ENEMY_SPEED_VARIATION; // Random value between -ENEMY_SPEED_VARIATION and +ENEMY_SPEED_VARIATION
+    const individualSpeed = Math.max(0.5, BASE_ENEMY_SPEED + speedVariation); // Ensure a minimum positive speed
+
     enemies.push({
         x: x,
         y: y,
@@ -185,7 +225,8 @@ function spawnEnemy(x, y, type, color, intensity) {
         height: ENEMY_SIZE,
         active: true,
         color: color,
-        intensity: intensity
+        intensity: intensity,
+        speed: individualSpeed // Store individual speed for this enemy
     });
 }
 
