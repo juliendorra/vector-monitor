@@ -110,11 +110,12 @@ export function updateGame(input) {
 
     // Player movement with acceleration and friction
     let isAccelerating = false;
-    if (input.isLeftArrowDown()) {
+    // Check both keyboard and touch inputs for movement
+    if (input.isLeftArrowDown() || input.isSwipeLeftActive()) {
         player.dx -= PLAYER_ACCELERATION;
         isAccelerating = true;
     }
-    if (input.isRightArrowDown()) {
+    if (input.isRightArrowDown() || input.isSwipeRightActive()) {
         player.dx += PLAYER_ACCELERATION;
         isAccelerating = true;
     }
@@ -147,7 +148,8 @@ export function updateGame(input) {
     }
 
     // Player shooting
-    if (input.isSpaceBarDown() && projectiles.length < MAX_PROJECTILES) {
+    // Check both keyboard and touch inputs for shooting
+    if ((input.isSpaceBarDown() || input.wasShootTap()) && projectiles.length < MAX_PROJECTILES) {
         // Basic cooldown by limiting max projectiles on screen
         // A more robust cooldown would use timestamps
         let canShoot = true;
