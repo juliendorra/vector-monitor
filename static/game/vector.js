@@ -14,18 +14,18 @@ const DVG_SCALE_INDEX_1X = 2; // Assuming scalers[2] is 1.0x
  */
 function toDVGCoords(gameX, gameY, gameWidth, gameHeight) {
     // --- BEGIN VECTOR.JS DIAGNOSTIC LOGGING ---
-    console.log(`[vector.js toDVGCoords] called with: 
-            gameX=${gameX} (type: ${typeof gameX}), 
-            gameY=${gameY} (type: ${typeof gameY}), 
-            gameWidth=${gameWidth} (type: ${typeof gameWidth}), 
-            gameHeight=${gameHeight} (type: ${typeof gameHeight})`);
+    // console.log(`[vector.js toDVGCoords] called with: 
+    //         gameX=${gameX} (type: ${typeof gameX}), 
+    //         gameY=${gameY} (type: ${typeof gameY}), 
+    //         gameWidth=${gameWidth} (type: ${typeof gameWidth}), 
+    //         gameHeight=${gameHeight} (type: ${typeof gameHeight})`);
     // --- END VECTOR.JS DIAGNOSTIC LOGGING ---
     const result = {
         x: Math.round(gameX - gameWidth / 2),
         y: Math.round(gameY - gameHeight / 2) // Y increases downwards from center
     };
     // Log the result as well
-    console.log(`[vector.js toDVGCoords] result: x=${result.x}, y=${result.y}`);
+    // console.log(`[vector.js toDVGCoords] result: x=${result.x}, y=${result.y}`);
     return result;
 }
 
@@ -74,49 +74,49 @@ function drawLetter(letter, startX, startY, size, intensity) {
     const commands = [];
     const letterWidth = size * 0.8;
     const letterHeight = size;
-    
+
     switch (letter.toUpperCase()) {
         case 'G':
             // Draw G: vertical left line, top horizontal, middle horizontal (shorter), bottom horizontal
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
             commands.push(vctr(0, letterHeight, 1, intensity)); // Left vertical
             commands.push(vctr(letterWidth, 0, 1, intensity)); // Bottom horizontal
-            commands.push(vctr(0, -letterHeight/2, 1, intensity)); // Right vertical (half)
-            commands.push(vctr(-letterWidth/2, 0, 1, intensity)); // Middle horizontal (half)
+            commands.push(vctr(0, -letterHeight / 2, 1, intensity)); // Right vertical (half)
+            commands.push(vctr(-letterWidth / 2, 0, 1, intensity)); // Middle horizontal (half)
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
             commands.push(vctr(letterWidth, 0, 1, intensity)); // Top horizontal
             break;
-            
+
         case 'A':
             // Draw A: left diagonal, right diagonal, middle horizontal
             commands.push(labs(startX, startY + letterHeight, DVG_SCALE_INDEX_1X));
-            commands.push(vctr(letterWidth/2, -letterHeight, 1, intensity)); // Left diagonal
-            commands.push(vctr(letterWidth/2, letterHeight, 1, intensity)); // Right diagonal
-            commands.push(labs(startX + letterWidth/4, startY + letterHeight/2, DVG_SCALE_INDEX_1X));
-            commands.push(vctr(letterWidth/2, 0, 1, intensity)); // Middle horizontal
+            commands.push(vctr(letterWidth / 2, -letterHeight, 1, intensity)); // Left diagonal
+            commands.push(vctr(letterWidth / 2, letterHeight, 1, intensity)); // Right diagonal
+            commands.push(labs(startX + letterWidth / 4, startY + letterHeight / 2, DVG_SCALE_INDEX_1X));
+            commands.push(vctr(letterWidth / 2, 0, 1, intensity)); // Middle horizontal
             break;
-            
+
         case 'M':
             // Draw M: left vertical, left diagonal to center top, right diagonal to right bottom, right vertical
             commands.push(labs(startX, startY + letterHeight, DVG_SCALE_INDEX_1X));
             commands.push(vctr(0, -letterHeight, 1, intensity)); // Left vertical
-            commands.push(vctr(letterWidth/2, letterHeight/2, 1, intensity)); // Left diagonal to center
-            commands.push(vctr(letterWidth/2, -letterHeight/2, 1, intensity)); // Right diagonal
+            commands.push(vctr(letterWidth / 2, letterHeight / 2, 1, intensity)); // Left diagonal to center
+            commands.push(vctr(letterWidth / 2, -letterHeight / 2, 1, intensity)); // Right diagonal
             commands.push(vctr(0, letterHeight, 1, intensity)); // Right vertical
             break;
-            
+
         case 'E':
             // Draw E: left vertical, top horizontal, middle horizontal, bottom horizontal
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
             commands.push(vctr(0, letterHeight, 1, intensity)); // Left vertical
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
             commands.push(vctr(letterWidth, 0, 1, intensity)); // Top horizontal
-            commands.push(labs(startX, startY + letterHeight/2, DVG_SCALE_INDEX_1X));
+            commands.push(labs(startX, startY + letterHeight / 2, DVG_SCALE_INDEX_1X));
             commands.push(vctr(letterWidth * 0.7, 0, 1, intensity)); // Middle horizontal
             commands.push(labs(startX, startY + letterHeight, DVG_SCALE_INDEX_1X));
             commands.push(vctr(letterWidth, 0, 1, intensity)); // Bottom horizontal
             break;
-            
+
         case 'O':
             // Draw O: rectangle
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
@@ -125,38 +125,38 @@ function drawLetter(letter, startX, startY, size, intensity) {
             commands.push(vctr(-letterWidth, 0, 1, intensity)); // Bottom
             commands.push(vctr(0, -letterHeight, 1, intensity)); // Left
             break;
-            
+
         case 'V':
             // Draw V: left diagonal down, right diagonal up
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
-            commands.push(vctr(letterWidth/2, letterHeight, 1, intensity)); // Left diagonal
-            commands.push(vctr(letterWidth/2, -letterHeight, 1, intensity)); // Right diagonal
+            commands.push(vctr(letterWidth / 2, letterHeight, 1, intensity)); // Left diagonal
+            commands.push(vctr(letterWidth / 2, -letterHeight, 1, intensity)); // Right diagonal
             break;
-            
+
         case 'R':
             // Draw R: left vertical, top horizontal, right vertical (half), middle horizontal, diagonal
             commands.push(labs(startX, startY, DVG_SCALE_INDEX_1X));
             commands.push(vctr(0, letterHeight, 1, intensity)); // Left vertical
             commands.push(vctr(letterWidth, 0, 1, intensity)); // Top horizontal
-            commands.push(vctr(0, letterHeight/2, 1, intensity)); // Right vertical (half)
+            commands.push(vctr(0, letterHeight / 2, 1, intensity)); // Right vertical (half)
             commands.push(vctr(-letterWidth, 0, 1, intensity)); // Middle horizontal
-            commands.push(vctr(letterWidth, letterHeight/2, 1, intensity)); // Diagonal leg
+            commands.push(vctr(letterWidth, letterHeight / 2, 1, intensity)); // Diagonal leg
             break;
-            
+
         case ' ':
             // Space - no drawing
             break;
-            
+
         default:
             // Unknown letter - draw a small square
-            commands.push(labs(startX + letterWidth/4, startY + letterHeight/4, DVG_SCALE_INDEX_1X));
-            commands.push(vctr(letterWidth/2, 0, 1, intensity));
-            commands.push(vctr(0, letterHeight/2, 1, intensity));
-            commands.push(vctr(-letterWidth/2, 0, 1, intensity));
-            commands.push(vctr(0, -letterHeight/2, 1, intensity));
+            commands.push(labs(startX + letterWidth / 4, startY + letterHeight / 4, DVG_SCALE_INDEX_1X));
+            commands.push(vctr(letterWidth / 2, 0, 1, intensity));
+            commands.push(vctr(0, letterHeight / 2, 1, intensity));
+            commands.push(vctr(-letterWidth / 2, 0, 1, intensity));
+            commands.push(vctr(0, -letterHeight / 2, 1, intensity));
             break;
     }
-    
+
     return commands;
 }
 
@@ -174,25 +174,25 @@ export function drawGameOverText(gameWidth, gameHeight, colorIndex = 0, intensit
     const letterSize = 40;
     const letterSpacing = letterSize * 1.2;
     const totalWidth = text.length * letterSpacing;
-    
+
     // Calculate starting position to center the text
     const startGameX = gameWidth / 2 - totalWidth / 2;
     const startGameY = gameHeight / 2 - letterSize / 2;
-    
+
     // Convert to DVG coordinates
     const startDVG = toDVGCoords(startGameX, startGameY, gameWidth, gameHeight);
-    
+
     commands.push(color(colorIndex));
-    
+
     // Draw each letter
     for (let i = 0; i < text.length; i++) {
         const letter = text[i];
         const letterX = startDVG.x + i * letterSpacing;
         const letterY = startDVG.y;
-        
+
         commands.push(...drawLetter(letter, letterX, letterY, letterSize, intensity));
     }
-    
+
     return commands;
 }
 
@@ -395,7 +395,7 @@ export function drawExplosionFragment(fragment, gameWidth, gameHeight) {
     const gameP1 = {
         x: fragment.x - halfLen * cosAngle,
         y: fragment.y - halfLen * sinAngle  // In game space, Y is down, but standard angle math (0 rad = +X axis) is used.
-                                            // The toDVGCoords will handle Y inversion.
+        // The toDVGCoords will handle Y inversion.
     };
     const gameP2 = {
         x: fragment.x + halfLen * cosAngle,

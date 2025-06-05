@@ -93,7 +93,8 @@ function sendDVGCommands(dvgString, vps = 200) {
                 },
                 webGLBeamSpeed: 10000,
                 webGLIntraVectorDecayRate: 8.9,
-                webGLAntialiasPixelWidth: 1.5
+                webGLAntialiasPixelWidth: 1.5,
+                hideMonitorToolboxPermanently: true // Game requests monitor toolbox to be hidden
             }
         };
         gameConnection.send(payload);
