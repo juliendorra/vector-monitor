@@ -134,6 +134,9 @@ export function startGame(sendFunction) {
     sendDVGToMonitor = sendFunction; // Assign the passed function
     lastSentDVGString = null; // Reset last sent DVG string to ensure the first frame is sent
 
+    // Initialize input system with the ID of the game area (iframe)
+    input.initializeInput('monitorFrame');
+
     const levelData = levels.getCurrentLevelData();
     if (!levelData) {
         console.error("Failed to load level data. Cannot start game.");

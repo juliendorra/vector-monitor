@@ -106,7 +106,17 @@ export function restartGame() {
 
 // Update game state - called every frame
 export function updateGame(input) {
-    if (gameState !== 'playing') return;
+    // Handle game over state and restart input first
+    if (gameState === 'gameOver') {
+        if (input.isRKeyDown() || input.wasAnyTapForRestart()) {
+            restartGame();
+            // gameState is now 'playing', execution will continue to 'playing' logic below
+        } else {
+            return; // Still game over, and no restart input, so skip 'playing' logic
+        }
+    }
+
+    // At this point, gameState must be 'playing' (either it was, or it was just reset)
 
     // Player movement with acceleration and friction
     let isAccelerating = false;
@@ -209,7 +219,16 @@ export function updateGame(input) {
         spawnEnemy(randomX, -ENEMY_SIZE / 2, randomType, randomColor, 10 + Math.floor(Math.random() * 6));
     }
 
-    if (gameState === 'gameOver') {
+    // If player's lives drop to 0 during the 'playing' logic, transition to 'gameOver'.
+    // This check is implicitly handled by player.lives-- in enemy collision/out-of-bounds logic
+    // which then sets gameState = 'gameOver'.
+    // The console log for game over score will happen on the frame *after* it's set,
+    // if no restart input is detected immediately.
+    // If a restart happens in the same frame lives run out, this specific log might be skipped
+    // as gameState is reset to 'playing' before this point.
+    // For more immediate "Game Over" text on screen, the drawing logic needs to check gameState.
+    // The current drawing logic in main.js already handles drawing "GAME OVER" text.
+    if (gameState === 'gameOver') { // This means game ended in *this* frame's update cycle
         console.log('Game Over. Final Score:', player.score);
     }
 }

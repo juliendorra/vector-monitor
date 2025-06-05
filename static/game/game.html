@@ -21,8 +21,14 @@
 
         iframe {
             border: none;
-            width: 80vw;
-            height: 70vh;
+            /* Updated for responsiveness and aspect ratio */
+            display: block;
+            width: 95vw; /* Adjust width to be responsive */
+            max-width: 100%; /* Ensure it doesn't overflow container */
+            margin: auto; /* Center the iframe */
+            aspect-ratio: 4 / 3; /* Maintain 4:3 aspect ratio */
+            max-height: 70vh; /* Limit height, width will adjust due to aspect-ratio */
+            height: auto; /* Allow height to be determined by aspect-ratio and width/max-height */
         }
 
         .instructions {
@@ -34,7 +40,9 @@
             padding: 15px;
             border: 2px solid #00ff00;
             border-radius: 5px;
-            max-width: 80vw;
+            /* Updated for responsiveness */
+            max-width: 95vw;
+            box-sizing: border-box; /* Include padding and border in the element's total width and height */
         }
 
         .instructions h3 {
@@ -68,6 +76,7 @@
             <strong>Touch:</strong> Swipe Left/Right (Bottom Half): Move Ship &nbsp;&nbsp;
             Tap (Top Half): Fire
         </p>
+        <p>When game is over: Tap screen (or press <span class="key">R</span>) to restart.</p>
         <p>Destroy enemies to score points! Avoid collisions or enemies reaching the bottom!</p>
     </div>
 

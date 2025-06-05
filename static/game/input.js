@@ -1,31 +1,38 @@
 // static/game/input.js
+// ES5 compatibility refactor
 
-const keyStates = {
+var keyStates = {
     ArrowLeft: false,
     ArrowRight: false,
     Space: false, // For spacebar
     KeyR: false, // For restart
 };
 
-const allowedKeys = Object.keys(keyStates);
+var allowedKeys = Object.keys(keyStates);
 
 // Touch state variables
-const SWIPE_THRESHOLD_X = 30; // Min pixels to be considered a swipe
-const TAP_MAX_DURATION = 200; // Max ms to be considered a tap
-const TAP_MAX_MOVEMENT = 20; // Max pixels moved to be considered a tap
+var SWIPE_THRESHOLD_X = 30; // Min pixels to be considered a swipe
+var TAP_MAX_DURATION = 200; // Max ms to be considered a tap
+var TAP_MAX_MOVEMENT = 20; // Max pixels moved to be considered a tap
 
-let touchStartData = {}; // Stores data for active touches { id: { x, y, time, type: 'swipe'/'tap' } }
-let activeSwipes = { left: false, right: false }; // Tracks active swipe states
-let shootTapRegistered = false;
+var touchStartData = {}; // Stores data for active touches { id: { x, y, time, type: 'swipe'/'tap' } }
+var activeSwipes = { left: false, right: false }; // Tracks active swipe states
+var shootTapRegistered = false;
+
+// Reference to the game area element for touch coordinate calculations
+var gameAreaElement = null;
+var anyTapRegisteredForRestart = false; // For game over restart
 
 // --- Keyboard Event Handlers ---
 function handleKeyDown(event) {
-    if (allowedKeys.includes(event.code)) {
+    // ES5: Replaced .includes with .indexOf
+    if (allowedKeys.indexOf(event.code) !== -1) {
         keyStates[event.code] = true;
-        if (['ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+        // ES5: Replaced .includes with .indexOf
+        if (['ArrowLeft', 'ArrowRight', 'Space'].indexOf(event.code) !== -1) {
             event.preventDefault();
         }
-        // console.log(`Key down: ${event.code}`);
+        // console.log('Key down: ' + event.code); // ES5: Replaced template literal
     } else if (event.key === ' ') {
         keyStates['Space'] = true;
         event.preventDefault();
@@ -34,12 +41,14 @@ function handleKeyDown(event) {
 }
 
 function handleKeyUp(event) {
-    if (allowedKeys.includes(event.code)) {
+    // ES5: Replaced .includes with .indexOf
+    if (allowedKeys.indexOf(event.code) !== -1) {
         keyStates[event.code] = false;
-        if (['ArrowLeft', 'ArrowRight', 'Space'].includes(event.code)) {
+        // ES5: Replaced .includes with .indexOf
+        if (['ArrowLeft', 'ArrowRight', 'Space'].indexOf(event.code) !== -1) {
             event.preventDefault();
         }
-        // console.log(`Key up: ${event.code}`);
+        // console.log('Key up: ' + event.code); // ES5: Replaced template literal
     } else if (event.key === ' ') {
         keyStates['Space'] = false;
         event.preventDefault();
@@ -50,68 +59,94 @@ function handleKeyUp(event) {
 // --- Touch Event Handlers ---
 function handleTouchStart(event) {
     event.preventDefault(); // Prevent default touch behaviors like scrolling
-    const screenHeight = window.innerHeight;
-    Array.from(event.changedTouches).forEach(touch => {
-        const touchY = touch.clientY;
-        const touchId = touch.identifier;
 
-        if (touchY > screenHeight / 2) { // Bottom half for swipes
+    if (!gameAreaElement) {
+        console.error("Input module: gameAreaElement is not set. Cannot process touch start.");
+        return;
+    }
+    var rect = gameAreaElement.getBoundingClientRect();
+
+    // ES5: Replaced Array.from().forEach() with a standard for loop
+    for (var i = 0; i < event.changedTouches.length; i++) {
+        var touch = event.changedTouches[i];
+        var touchClientY = touch.clientY; // Y coordinate relative to the viewport
+        var touchId = touch.identifier;
+
+        // Calculate touch Y relative to the game area
+        var touchRelativeY = touchClientY - rect.top;
+
+        // Ensure the touch is within the vertical bounds of the game area
+        if (touchClientY < rect.top || touchClientY > rect.bottom) {
+            // console.log('Touch ID ' + touchId + ' is outside game area vertical bounds.');
+            continue; // Skip this touch
+        }
+
+        // Determine zone based on touchRelativeY and rect.height
+        if (touchRelativeY > rect.height / 2) { // Bottom half of game area for swipes
             touchStartData[touchId] = {
-                x: touch.clientX,
-                y: touch.clientY,
+                x: touch.clientX, // clientX is fine for delta calculations later
+                y: touch.clientY, // Store original clientY for consistency if needed, though relativeY is key for zone
                 time: event.timeStamp,
                 type: 'swipe'
             };
-            // console.log(`Touch start (swipe zone): ID ${touchId} at (${touch.clientX}, ${touch.clientY})`);
-        } else { // Top half for taps
+            // console.log('Touch start (swipe zone): ID ' + touchId + ' at (' + touch.clientX + ', ' + touchClientY + ') relativeY: ' + touchRelativeY.toFixed(2));
+        } else { // Top half of game area for taps (touchRelativeY <= rect.height / 2)
             touchStartData[touchId] = {
                 x: touch.clientX,
-                y: touch.clientY,
+                y: touch.clientY, // Store original clientY
                 time: event.timeStamp,
                 type: 'tap'
             };
-            // console.log(`Touch start (tap zone): ID ${touchId} at (${touch.clientX}, ${touch.clientY})`);
+            // console.log('Touch start (tap zone): ID ' + touchId + ' at (' + touch.clientX + ', ' + touchClientY + ') relativeY: ' + touchRelativeY.toFixed(2));
         }
-    });
+    }
 }
 
 function handleTouchMove(event) {
     event.preventDefault();
-    Array.from(event.changedTouches).forEach(touch => {
-        const touchId = touch.identifier;
+    // ES5: Replaced Array.from().forEach() with a standard for loop
+    for (var i = 0; i < event.changedTouches.length; i++) {
+        var touch = event.changedTouches[i];
+        var touchId = touch.identifier;
         if (!touchStartData[touchId] || touchStartData[touchId].type !== 'swipe') {
-            return; // Not a swipe touch or touch data lost
+            // In a for loop, 'return' would exit the function. Use 'continue' to skip to the next iteration.
+            continue;
         }
 
-        const startX = touchStartData[touchId].x;
-        const currentX = touch.clientX;
-        const deltaX = currentX - startX;
+        var startX = touchStartData[touchId].x;
+        var currentX = touch.clientX;
+        var deltaX = currentX - startX;
 
         if (Math.abs(deltaX) > SWIPE_THRESHOLD_X) {
             if (deltaX < 0) {
                 activeSwipes.left = true;
                 activeSwipes.right = false; // Ensure only one direction
-                // console.log(`Swipe left detected: ID ${touchId}`);
+                // console.log('Swipe left detected: ID ' + touchId); // ES5: Template literal
             } else {
                 activeSwipes.right = true;
                 activeSwipes.left = false; // Ensure only one direction
-                // console.log(`Swipe right detected: ID ${touchId}`);
+                // console.log('Swipe right detected: ID ' + touchId); // ES5: Template literal
             }
             // Optional: update startX to currentX to allow continuous swiping or require new touch
             // For this implementation, a swipe is latched until touch end.
         }
-    });
+    }
 }
 
 function handleTouchEndOrCancel(event) {
     event.preventDefault();
-    Array.from(event.changedTouches).forEach(touch => {
-        const touchId = touch.identifier;
-        const startData = touchStartData[touchId];
+    // ES5: Replaced Array.from().forEach() with a standard for loop
+    for (var i = 0; i < event.changedTouches.length; i++) {
+        var touch = event.changedTouches[i];
+        var touchId = touch.identifier;
+        var startData = touchStartData[touchId];
 
-        if (!startData) return;
+        if (!startData) {
+            // In a for loop, 'return' would exit the function. Use 'continue' to skip to the next iteration.
+            continue;
+        }
 
-        // console.log(`Touch end/cancel: ID ${touchId}, type: ${startData.type}`);
+        // console.log('Touch end/cancel: ID ' + touchId + ', type: ' + startData.type); // ES5: Template literal
 
         if (startData.type === 'swipe') {
             // Reset active swipe states if this touch was causing them.
@@ -120,25 +155,46 @@ function handleTouchEndOrCancel(event) {
             // For now, any swipe touch ending resets both.
             activeSwipes.left = false;
             activeSwipes.right = false;
-            // console.log(`Swipe ended for ID ${touchId}. Active swipes reset.`);
+            // console.log('Swipe ended for ID ' + touchId + '. Active swipes reset.'); // ES5: Template literal
         } else if (startData.type === 'tap') {
-            const duration = event.timeStamp - startData.time;
-            const deltaX = Math.abs(touch.clientX - startData.x);
-            const deltaY = Math.abs(touch.clientY - startData.y);
+            var duration = event.timeStamp - startData.time;
+            var deltaX = Math.abs(touch.clientX - startData.x);
+            var deltaY = Math.abs(touch.clientY - startData.y);
 
             if (duration < TAP_MAX_DURATION && deltaX < TAP_MAX_MOVEMENT && deltaY < TAP_MAX_MOVEMENT) {
-                shootTapRegistered = true;
-                // console.log(`Tap registered: ID ${touchId}`);
+                // This is a valid tap.
+                // If it's in the top half (shoot zone), it's a shoot tap.
+                // Regardless of zone, any valid tap on the game area can be used for restart.
+                shootTapRegistered = true; // This will only be effective if game is 'playing' and tap is in shoot zone.
+                anyTapRegisteredForRestart = true; // Always register any valid tap for potential restart.
+                // console.log('Tap registered: ID ' + touchId + '. Shoot: ' + shootTapRegistered + '. Restart: ' + anyTapRegisteredForRestart);
             } else {
-                // console.log(`Tap conditions not met: ID ${touchId}, duration: ${duration}, deltaX: ${deltaX}, deltaY: ${deltaY}`);
+                // console.log('Tap conditions not met: ID ' + touchId + ', duration: ' + duration + ', deltaX: ' + deltaX + ', deltaY: ' + deltaY);
             }
         }
         delete touchStartData[touchId]; // Clean up touch data
-    });
+    }
 }
 
+// The 'export' keyword is ES6. If this code is not processed by a bundler/transpiler (like Babel or Webpack),
+// these functions would not be directly usable as module exports in older browsers.
+// For true ES5 environments without a build step, you would typically assign these to a global object,
+// e.g., window.MyInputLib = { initializeInput: initializeInput, ... };
+// However, the project structure seems to use ES6 modules, so we'll assume a build step handles this.
+export function initializeInput(gameAreaElementId) { // Added gameAreaElementId parameter
+    if (gameAreaElementId) {
+        gameAreaElement = document.getElementById(gameAreaElementId);
+        if (!gameAreaElement) {
+            console.error("Input module: Game area element with ID '" + gameAreaElementId + "' not found. Touch zones may be inaccurate.");
+            gameAreaElement = document.body; // Fallback
+        } else {
+            console.log("Input module: Using element '" + gameAreaElementId + "' for touch area calculations.");
+        }
+    } else {
+        console.warn("Input module: No gameAreaElementId provided. Defaulting to document.body for touch zones, which might be inaccurate.");
+        gameAreaElement = document.body; // Default if no ID is provided
+    }
 
-export function initializeInput() {
     document.addEventListener('keydown', handleKeyDown, { capture: true, passive: false });
     document.addEventListener('keyup', handleKeyUp, { capture: true, passive: false });
     
@@ -152,7 +208,7 @@ export function initializeInput() {
     document.addEventListener('touchend', handleTouchEndOrCancel, { passive: false });
     document.addEventListener('touchcancel', handleTouchEndOrCancel, { passive: false });
     
-    console.log('Input module initialized with keyboard and touch support.');
+    console.log('Input module initialized with keyboard and touch support (ES5 compatible, game area aware).');
 }
 
 export function getKeyState(keyName) {
@@ -196,14 +252,26 @@ export function wasShootTap() {
 
 // Optional: A function to get all key states (mostly for debugging keyboard)
 export function getAllKeyStates() {
-    return { ...keyStates };
+    // ES5: Replaced object spread with Object.assign
+    return Object.assign({}, keyStates);
 }
 
 // Optional: A function to get all touch states (for debugging)
 export function getTouchState() {
+    // ES5: Replaced object spread with Object.assign
     return {
         touchStartData: JSON.parse(JSON.stringify(touchStartData)), // Deep copy for inspection
-        activeSwipes: { ...activeSwipes },
-        shootTapRegistered
+        activeSwipes: Object.assign({}, activeSwipes),
+        shootTapRegistered: shootTapRegistered, // direct assignment
+        anyTapRegisteredForRestart: anyTapRegisteredForRestart // For debugging
     };
+}
+
+export function wasAnyTapForRestart() {
+    if (anyTapRegisteredForRestart) {
+        anyTapRegisteredForRestart = false; // Reset after check
+        // console.log('wasAnyTapForRestart: consumed restart tap.');
+        return true;
+    }
+    return false;
 }
