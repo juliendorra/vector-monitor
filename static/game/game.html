@@ -3,12 +3,13 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
     <title>Vector Arcade Game</title>
     <style>
         body {
             margin: 0;
             background-color: #111;
+            touch-action: manipulation; /* Prevent default touch actions like pinch-zoom */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -58,6 +59,16 @@
             border-radius: 3px;
             font-weight: bold;
             color: #ffffff;
+        }
+
+        /* Responsive adjustments for smaller screens */
+        @media (max-width: 600px) {
+            .instructions {
+                font-size: 14px;
+                padding: 8px;
+                margin-top: 10px;
+                line-height: 1.3;
+            }
         }
     </style>
 </head>

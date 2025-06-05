@@ -52,7 +52,6 @@ window.addEventListener('load', () => {
     const webGLAntialiasPixelWidthValueSpan = document.getElementById('webGLAntialiasPixelWidthValue');
     const webGLEndpointDwellTimeSlider = document.getElementById('webGLEndpointDwellTime');
     const webGLEndpointDwellTimeValueSpan = document.getElementById('webGLEndpointDwellTimeValue');
-    const permanentlyHideMonitorToolboxCheckbox = document.getElementById('permanentlyHideMonitorToolbox');
 
     let peer = null;
     let currentConnection = null;
@@ -406,9 +405,6 @@ JMPL START
         if (webGLIntraVectorDecayRateSlider) payload.metadata.webGLIntraVectorDecayRate = parseFloat(webGLIntraVectorDecayRateSlider.value);
         if (webGLAntialiasPixelWidthSlider) payload.metadata.webGLAntialiasPixelWidth = parseFloat(webGLAntialiasPixelWidthSlider.value);
         if (webGLEndpointDwellTimeSlider) payload.metadata.webGLEndpointDwellTime = parseFloat(webGLEndpointDwellTimeSlider.value);
-        if (permanentlyHideMonitorToolboxCheckbox) {
-            payload.metadata.hideMonitorToolboxPermanently = permanentlyHideMonitorToolboxCheckbox.checked;
-        }
 
         senderStatusDiv.textContent = `Status: Attempting to connect to ${targetPeerId}...`;
         if (currentConnection) currentConnection.close();
