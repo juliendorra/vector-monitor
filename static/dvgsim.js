@@ -133,6 +133,10 @@ var webGLAntialiasPixelWidthSlider = null, webGLAntialiasPixelWidthDisplay = nul
 var webGLEndpointDwellTime = 0.03; // Default dwell time in seconds
 var webGLEndpointDwellTimeSlider = null, webGLEndpointDwellTimeDisplay = null;
 
+// Toolbox visibility control
+var monitorControlsContainerElement = null;
+var isToolboxPermanentlyHidden = false;
+
 
 canvasElement.width = window.innerWidth;
 canvasElement.height = window.innerHeight;
@@ -462,6 +466,23 @@ function setupConnectionHandler() {
 
 			const receivedDvgText = payload.dvgProgramText;
 			const receivedMetadata = payload.metadata || {};
+
+			// Handle toolbox visibility metadata first
+			if (receivedMetadata && receivedMetadata.hasOwnProperty('hideMonitorToolboxPermanently')) {
+				isToolboxPermanentlyHidden = !!receivedMetadata.hideMonitorToolboxPermanently;
+			} else {
+				isToolboxPermanentlyHidden = false; // Default if not specified
+			}
+
+			if (monitorControlsContainerElement) {
+				if (isToolboxPermanentlyHidden) {
+					monitorControlsContainerElement.style.display = 'none';
+				} else {
+					// If not permanently hidden, it should be hidden by default,
+					// and then shown by hover/click.
+					monitorControlsContainerElement.style.display = 'none';
+				}
+			}
 
 			if (typeof receivedDvgText !== 'string') {
 				console.error('Received DVG program text is not a string:', receivedDvgText);
@@ -1175,6 +1196,60 @@ window.addEventListener("load", async () => {
 		webGLSettingsElement.style.display = 'none';
 	}
 	updateDifferentialDecayUI(); // Set initial values
+
+	monitorControlsContainerElement = document.getElementById('controlBox');
+
+	if (monitorControlsContainerElement) {
+		monitorControlsContainerElement.style.display = 'none'; // Hidden by default
+
+		const showControls = () => {
+			if (!isToolboxPermanentlyHidden && monitorControlsContainerElement) {
+				monitorControlsContainerElement.style.display = 'block';
+			}
+		};
+
+		const hideControlsOnMouseLeaveCanvas = () => {
+			if (!isToolboxPermanentlyHidden && monitorControlsContainerElement) {
+				// If mouse leaves canvas and enters toolbox, don't hide.
+				// The toolbox's own mouseleave will handle hiding later.
+				if (monitorControlsContainerElement.matches(':hover')) {
+					return;
+				}
+				monitorControlsContainerElement.style.display = 'none';
+			}
+		};
+
+		const toggleControlsOnCanvasClick = () => {
+			if (!isToolboxPermanentlyHidden && monitorControlsContainerElement) {
+				if (monitorControlsContainerElement.style.display === 'none' || monitorControlsContainerElement.style.display === '') {
+					monitorControlsContainerElement.style.display = 'block'; // Directly show
+				} else {
+					monitorControlsContainerElement.style.display = 'none'; // Directly hide
+				}
+			}
+		};
+
+		// Event listeners for canvas elements
+		const setupCanvasEventListeners = (canvas) => {
+			if (canvas) {
+				canvas.addEventListener('mouseenter', showControls);
+				canvas.addEventListener('click', toggleControlsOnCanvasClick);
+				canvas.addEventListener('mouseleave', hideControlsOnMouseLeaveCanvas);
+			}
+		};
+
+		setupCanvasEventListeners(canvasElement);
+		setupCanvasEventListeners(webGLCanvasElement);
+
+		// Event listener for hiding toolbox when mouse leaves the toolbox itself
+		monitorControlsContainerElement.addEventListener('mouseleave', () => {
+			if (!isToolboxPermanentlyHidden && monitorControlsContainerElement) {
+				// If mouse leaves toolbox, hide it.
+				// If it re-enters canvas immediately, canvas mouseenter would handle showing it again.
+				monitorControlsContainerElement.style.display = 'none';
+			}
+		});
+	}
 
 
 	if (canvasElement) {
