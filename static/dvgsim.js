@@ -9,6 +9,18 @@ var webGLSupported = false;
 var globalLineTexInternalFormat = null; // To store determined format for lineTexture
 var globalLineTexType = null;         // To store determined type for lineTexture
 
+// --- BEGIN DIMENSION AND SCALING CONSTANTS ---
+const PHYSICAL_CANVAS_WIDTH = 2048;
+const PHYSICAL_CANVAS_HEIGHT = 2048;
+// LOGICAL_DVG_WIDTH/HEIGHT represent the span of the DVG coordinate system, e.g., -512 to 511 is 1024 units.
+const LOGICAL_DVG_WIDTH = 1024;
+const LOGICAL_DVG_HEIGHT = 1024;
+const DVG_COORDINATE_SCALE_X = PHYSICAL_CANVAS_WIDTH / LOGICAL_DVG_WIDTH; // Should be 2
+const DVG_COORDINATE_SCALE_Y = PHYSICAL_CANVAS_HEIGHT / LOGICAL_DVG_HEIGHT; // Should be 2
+const PHYSICAL_CENTER_X = PHYSICAL_CANVAS_WIDTH / 2; // Should be 1024
+const PHYSICAL_CENTER_Y = PHYSICAL_CANVAS_HEIGHT / 2; // Should be 1024
+// --- END DIMENSION AND SCALING CONSTANTS ---
+
 // --- WebGL Helper Functions ---
 function createTextureHelper(glContext, width, height, internalFormat, format, type) {
 	const texture = glContext.createTexture();
@@ -138,10 +150,10 @@ var monitorControlsContainerElement = null;
 var isToolboxPermanentlyHidden = false;
 
 
-canvasElement.width = 2048;
-canvasElement.height = 2048;
-webGLCanvasElement.width = 2048;
-webGLCanvasElement.height = 2048;
+canvasElement.width = PHYSICAL_CANVAS_WIDTH;
+canvasElement.height = PHYSICAL_CANVAS_HEIGHT;
+webGLCanvasElement.width = PHYSICAL_CANVAS_WIDTH;
+webGLCanvasElement.height = PHYSICAL_CANVAS_HEIGHT;
 
 tailsX = Array(0, 0, 0);
 tailsY = Array(0, 0, 0);
@@ -197,8 +209,8 @@ function vecOp(opcode, a1, a2, a3, a4) {
 		// We'll handle centering in the drawing logic if needed, or shaders.
 		// For now, this op might need reinterpretation for WebGL's coordinate system.
 		// Let's assume it sets lastPoint to center.
-		this.x = 2048 / 2;
-		this.y = 2048 / 2;
+		this.x = PHYSICAL_CENTER_X;
+		this.y = PHYSICAL_CENTER_Y;
 	} else if (this.opcode == "COLOR") {
 		this.color = parseInt(a1) || 0;
 	} else if ((this.opcode == "JSRL") || (this.opcode == "JMPL")) { this.target = parseInt(a1); }
@@ -420,8 +432,8 @@ function toggleRenderer() {
 	pc = 0;
 	HALT_FLAG = 0;
 	lastIntensity = 8;
-	lastPoint.x = 2048 / 2;
-	lastPoint.y = 2048 / 2;
+	lastPoint.x = PHYSICAL_CENTER_X;
+	lastPoint.y = PHYSICAL_CENTER_Y;
 	if (!useWebGLRenderer && DVG) {
 		DVG.moveTo(lastPoint.x, lastPoint.y);
 		DVG.beginPath();
@@ -568,8 +580,8 @@ function setupConnectionHandler() {
 			pc = 0;
 			HALT_FLAG = 0;
 			lastIntensity = 8;
-			lastPoint.x = 2048 / 2;
-			lastPoint.y = 2048 / 2;
+			lastPoint.x = PHYSICAL_CENTER_X;
+			lastPoint.y = PHYSICAL_CENTER_Y;
 			if (!useWebGLRenderer && DVG) {
 				DVG.moveTo(lastPoint.x, lastPoint.y);
 				DVG.beginPath();
@@ -608,8 +620,8 @@ function render2DFrame() {
 			lastPoint.x = thisOp.x; lastPoint.y = thisOp.y;
 		}
 		else if (thisOp.opcode == "VCTR") {
-			var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
-			var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
+			var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * DVG_COORDINATE_SCALE_X;
+			var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * DVG_COORDINATE_SCALE_Y;
 			if (thisOp.intensity != lastIntensity) {
 				glowStroke2D(); lastIntensity = thisOp.intensity;
 				DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y);
@@ -617,8 +629,8 @@ function render2DFrame() {
 			lastPoint.x += relX; lastPoint.y += relY; DVG.lineTo(lastPoint.x, lastPoint.y);
 		}
 		else if (thisOp.opcode == "SVEC") {
-			var relX = (thisOp.x << (4 + thisOp.scale)) * 2;
-			var relY = (thisOp.y << (4 + thisOp.scale)) * 2;
+			var relX = (thisOp.x << (4 + thisOp.scale)) * DVG_COORDINATE_SCALE_X;
+			var relY = (thisOp.y << (4 + thisOp.scale)) * DVG_COORDINATE_SCALE_Y;
 			if (thisOp.intensity != lastIntensity) {
 				glowStroke2D(); lastIntensity = thisOp.intensity;
 				DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y);
@@ -735,8 +747,8 @@ function renderWebGLFrame() {
 				SCALE_FACTOR = thisOp.scale;
 			}
 			else if (thisOp.opcode == "VCTR") {
-				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
-				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
+				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * DVG_COORDINATE_SCALE_X;
+				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * DVG_COORDINATE_SCALE_Y;
 
 				if (thisOp.intensity != lastIntensity) {
 					lastIntensity = thisOp.intensity;
@@ -770,8 +782,8 @@ function renderWebGLFrame() {
 				accumulatedDurationWithinPass += vectorDrawDuration;
 			}
 			else if (thisOp.opcode == "SVEC") {
-				var relX = (thisOp.x << (4 + thisOp.scale)) * 2;
-				var relY = (thisOp.y << (4 + thisOp.scale)) * 2;
+				var relX = (thisOp.x << (4 + thisOp.scale)) * DVG_COORDINATE_SCALE_X;
+				var relY = (thisOp.y << (4 + thisOp.scale)) * DVG_COORDINATE_SCALE_Y;
 				if (thisOp.intensity != lastIntensity) {
 					lastIntensity = thisOp.intensity;
 				}
@@ -924,14 +936,14 @@ function renderWebGLFrame() {
 				lastPoint.x = thisOp.x; lastPoint.y = thisOp.y; SCALE_FACTOR = thisOp.scale;
 			}
 			else if (thisOp.opcode == "VCTR") {
-				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
-				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
+				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * DVG_COORDINATE_SCALE_X;
+				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * DVG_COORDINATE_SCALE_Y;
 				if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
 				lastPoint.x += relX; lastPoint.y += relY;
 			}
 			else if (thisOp.opcode == "SVEC") {
-				var relX = (thisOp.x << (4 + thisOp.scale)) * 2;
-				var relY = (thisOp.y << (4 + thisOp.scale)) * 2;
+				var relX = (thisOp.x << (4 + thisOp.scale)) * DVG_COORDINATE_SCALE_X;
+				var relY = (thisOp.y << (4 + thisOp.scale)) * DVG_COORDINATE_SCALE_Y;
 				if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
 				lastPoint.x += relX; lastPoint.y += relY;
 			} else if (thisOp.opcode == "JMPL") {
@@ -994,7 +1006,7 @@ function parseProgram() {
 
 		switch (command) {
 			case "VCTR": newOp = new vecOp("VCTR", splitLine[1], splitLine[2], splitLine[3], splitLine[4]); break;
-			case "LABS": newOp = new vecOp("LABS", (2048 / 2) + parseInt(splitLine[1]) * 2, (2048 / 2) + parseInt(splitLine[2]) * 2, splitLine[3]); break;
+			case "LABS": newOp = new vecOp("LABS", PHYSICAL_CENTER_X + parseInt(splitLine[1]) * DVG_COORDINATE_SCALE_X, PHYSICAL_CENTER_Y + parseInt(splitLine[2]) * DVG_COORDINATE_SCALE_Y, splitLine[3]); break;
 			case "HALT": newOp = new vecOp("HALT"); break;
 			case "JSRL":
 				if (codeLabels.hasOwnProperty(splitLine[1])) newOp = new vecOp("JSRL", codeLabels[splitLine[1]]);
@@ -1107,8 +1119,8 @@ window.addEventListener("resize", () => {
 		}
 	}
 	// Reset lastPoint to center on resize
-	lastPoint.x = 2048 / 2;
-	lastPoint.y = 2048 / 2;
+	lastPoint.x = PHYSICAL_CENTER_X;
+	lastPoint.y = PHYSICAL_CENTER_Y;
 });
 
 
@@ -1252,12 +1264,12 @@ window.addEventListener("load", async () => {
 
 
 	if (canvasElement) {
-		canvasElement.width = 2048;
-		canvasElement.height = 2048;
+		canvasElement.width = PHYSICAL_CANVAS_WIDTH;
+		canvasElement.height = PHYSICAL_CANVAS_HEIGHT;
 	}
 	if (webGLCanvasElement) {
-		webGLCanvasElement.width = 2048;
-		webGLCanvasElement.height = 2048;
+		webGLCanvasElement.width = PHYSICAL_CANVAS_WIDTH;
+		webGLCanvasElement.height = PHYSICAL_CANVAS_HEIGHT;
 	}
 
 	vps = document.getElementById("vps");
@@ -1269,8 +1281,8 @@ window.addEventListener("load", async () => {
 	parseProgram();
 	initializePeer();
 	// Set initial lastPoint based on the active renderer
-	lastPoint.x = 2048 / 2;
-	lastPoint.y = 2048 / 2;
+	lastPoint.x = PHYSICAL_CENTER_X;
+	lastPoint.y = PHYSICAL_CENTER_Y;
 
 	setInterval(mainLoop, 20);
 });
