@@ -138,10 +138,10 @@ var monitorControlsContainerElement = null;
 var isToolboxPermanentlyHidden = false;
 
 
-canvasElement.width = window.innerWidth;
-canvasElement.height = window.innerHeight;
-webGLCanvasElement.width = window.innerWidth;
-webGLCanvasElement.height = window.innerHeight;
+canvasElement.width = 2048;
+canvasElement.height = 2048;
+webGLCanvasElement.width = 2048;
+webGLCanvasElement.height = 2048;
 
 tailsX = Array(0, 0, 0);
 tailsY = Array(0, 0, 0);
@@ -197,8 +197,8 @@ function vecOp(opcode, a1, a2, a3, a4) {
 		// We'll handle centering in the drawing logic if needed, or shaders.
 		// For now, this op might need reinterpretation for WebGL's coordinate system.
 		// Let's assume it sets lastPoint to center.
-		this.x = (useWebGLRenderer ? webGLCanvasElement.width : canvasElement.width) / 2;
-		this.y = (useWebGLRenderer ? webGLCanvasElement.height : canvasElement.height) / 2;
+		this.x = 2048 / 2;
+		this.y = 2048 / 2;
 	} else if (this.opcode == "COLOR") {
 		this.color = parseInt(a1) || 0;
 	} else if ((this.opcode == "JSRL") || (this.opcode == "JMPL")) { this.target = parseInt(a1); }
@@ -420,9 +420,8 @@ function toggleRenderer() {
 	pc = 0;
 	HALT_FLAG = 0;
 	lastIntensity = 8;
-	const currentCanvas = useWebGLRenderer ? webGLCanvasElement : canvasElement;
-	lastPoint.x = currentCanvas.width / 2;
-	lastPoint.y = currentCanvas.height / 2;
+	lastPoint.x = 2048 / 2;
+	lastPoint.y = 2048 / 2;
 	if (!useWebGLRenderer && DVG) {
 		DVG.moveTo(lastPoint.x, lastPoint.y);
 		DVG.beginPath();
@@ -569,9 +568,8 @@ function setupConnectionHandler() {
 			pc = 0;
 			HALT_FLAG = 0;
 			lastIntensity = 8;
-			const currentCanvas = useWebGLRenderer ? webGLCanvasElement : canvasElement;
-			lastPoint.x = currentCanvas.width / 2;
-			lastPoint.y = currentCanvas.height / 2;
+			lastPoint.x = 2048 / 2;
+			lastPoint.y = 2048 / 2;
 			if (!useWebGLRenderer && DVG) {
 				DVG.moveTo(lastPoint.x, lastPoint.y);
 				DVG.beginPath();
@@ -989,12 +987,12 @@ function parseProgram() {
 		var splitLine = currentLine.split(/\s+/);
 		let newOp;
 		const command = splitLine[0].toUpperCase();
-		const currentCanvas = useWebGLRenderer ? webGLCanvasElement : canvasElement;
+		// const currentCanvas = useWebGLRenderer ? webGLCanvasElement : canvasElement; // No longer needed for LABS
 
 
 		switch (command) {
 			case "VCTR": newOp = new vecOp("VCTR", splitLine[1], splitLine[2], splitLine[3], splitLine[4]); break;
-			case "LABS": newOp = new vecOp("LABS", (currentCanvas.width / 2) + parseInt(splitLine[1]), (currentCanvas.height / 2) + parseInt(splitLine[2]), splitLine[3]); break;
+			case "LABS": newOp = new vecOp("LABS", (2048 / 2) + parseInt(splitLine[1]), (2048 / 2) + parseInt(splitLine[2]), splitLine[3]); break;
 			case "HALT": newOp = new vecOp("HALT"); break;
 			case "JSRL":
 				if (codeLabels.hasOwnProperty(splitLine[1])) newOp = new vecOp("JSRL", codeLabels[splitLine[1]]);
@@ -1092,14 +1090,14 @@ window.addEventListener("mousemove", mouseHandle, true);
 window.addEventListener("keydown", keyHandle, true);
 
 window.addEventListener("resize", () => {
-	canvasElement.width = window.innerWidth;
-	canvasElement.height = window.innerHeight;
-	webGLCanvasElement.width = window.innerWidth;
-	webGLCanvasElement.height = window.innerHeight;
+	// canvasElement.width = window.innerWidth; // Remove
+	// canvasElement.height = window.innerHeight; // Remove
+	// webGLCanvasElement.width = window.innerWidth; // Remove
+	// webGLCanvasElement.height = window.innerHeight; // Remove
 
 	if (gl && useWebGLRenderer && webGLSupported) { // Ensure WebGL is initialized and active
-		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-		if (!recreateWebGLResources(gl.canvas.width, gl.canvas.height)) {
+		gl.viewport(0, 0, gl.canvas.width, gl.canvas.height); // Will use 2048x2048
+		if (!recreateWebGLResources(gl.canvas.width, gl.canvas.height)) { // Will use 2048x2048
 			console.error("Failed to resize WebGL resources. Display might be corrupted.");
 			// Optionally, could disable WebGL renderer or show an error to the user
 			// For now, just log and continue; the renderer might become unstable.
@@ -1107,9 +1105,8 @@ window.addEventListener("resize", () => {
 		}
 	}
 	// Reset lastPoint to center on resize
-	const currentCanvas = useWebGLRenderer && webGLSupported ? webGLCanvasElement : canvasElement;
-	lastPoint.x = currentCanvas.width / 2;
-	lastPoint.y = currentCanvas.height / 2;
+	lastPoint.x = 2048 / 2;
+	lastPoint.y = 2048 / 2;
 });
 
 
@@ -1253,12 +1250,12 @@ window.addEventListener("load", async () => {
 
 
 	if (canvasElement) {
-		canvasElement.width = window.innerWidth;
-		canvasElement.height = window.innerHeight;
+		canvasElement.width = 2048;
+		canvasElement.height = 2048;
 	}
 	if (webGLCanvasElement) {
-		webGLCanvasElement.width = window.innerWidth;
-		webGLCanvasElement.height = window.innerHeight;
+		webGLCanvasElement.width = 2048;
+		webGLCanvasElement.height = 2048;
 	}
 
 	vps = document.getElementById("vps");
@@ -1270,9 +1267,8 @@ window.addEventListener("load", async () => {
 	parseProgram();
 	initializePeer();
 	// Set initial lastPoint based on the active renderer
-	const currentCanvas = useWebGLRenderer && webGLSupported ? webGLCanvasElement : canvasElement;
-	lastPoint.x = currentCanvas.width / 2;
-	lastPoint.y = currentCanvas.height / 2;
+	lastPoint.x = 2048 / 2;
+	lastPoint.y = 2048 / 2;
 
 	setInterval(mainLoop, 20);
 });
