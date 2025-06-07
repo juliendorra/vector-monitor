@@ -608,8 +608,8 @@ function render2DFrame() {
 			lastPoint.x = thisOp.x; lastPoint.y = thisOp.y;
 		}
 		else if (thisOp.opcode == "VCTR") {
-			var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
-			var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
+			var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
+			var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
 			if (thisOp.intensity != lastIntensity) {
 				glowStroke2D(); lastIntensity = thisOp.intensity;
 				DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y);
@@ -617,7 +617,8 @@ function render2DFrame() {
 			lastPoint.x += relX; lastPoint.y += relY; DVG.lineTo(lastPoint.x, lastPoint.y);
 		}
 		else if (thisOp.opcode == "SVEC") {
-			var relX = thisOp.x << (4 + thisOp.scale); var relY = thisOp.y << (4 + thisOp.scale);
+			var relX = (thisOp.x << (4 + thisOp.scale)) * 2;
+			var relY = (thisOp.y << (4 + thisOp.scale)) * 2;
 			if (thisOp.intensity != lastIntensity) {
 				glowStroke2D(); lastIntensity = thisOp.intensity;
 				DVG.beginPath(); DVG.moveTo(lastPoint.x, lastPoint.y);
@@ -734,8 +735,8 @@ function renderWebGLFrame() {
 				SCALE_FACTOR = thisOp.scale;
 			}
 			else if (thisOp.opcode == "VCTR") {
-				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
-				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
+				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
+				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
 
 				if (thisOp.intensity != lastIntensity) {
 					lastIntensity = thisOp.intensity;
@@ -769,8 +770,8 @@ function renderWebGLFrame() {
 				accumulatedDurationWithinPass += vectorDrawDuration;
 			}
 			else if (thisOp.opcode == "SVEC") {
-				var relX = thisOp.x << (4 + thisOp.scale);
-				var relY = thisOp.y << (4 + thisOp.scale);
+				var relX = (thisOp.x << (4 + thisOp.scale)) * 2;
+				var relY = (thisOp.y << (4 + thisOp.scale)) * 2;
 				if (thisOp.intensity != lastIntensity) {
 					lastIntensity = thisOp.intensity;
 				}
@@ -923,13 +924,14 @@ function renderWebGLFrame() {
 				lastPoint.x = thisOp.x; lastPoint.y = thisOp.y; SCALE_FACTOR = thisOp.scale;
 			}
 			else if (thisOp.opcode == "VCTR") {
-				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
-				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]);
+				var relX = parseInt(thisOp.x * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
+				var relY = parseInt(thisOp.y * scalers[SCALE_FACTOR] / divisors[thisOp.divisor]) * 2;
 				if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
 				lastPoint.x += relX; lastPoint.y += relY;
 			}
 			else if (thisOp.opcode == "SVEC") {
-				var relX = thisOp.x << (4 + thisOp.scale); var relY = thisOp.y << (4 + thisOp.scale);
+				var relX = (thisOp.x << (4 + thisOp.scale)) * 2;
+				var relY = (thisOp.y << (4 + thisOp.scale)) * 2;
 				if (thisOp.intensity != lastIntensity) { lastIntensity = thisOp.intensity; }
 				lastPoint.x += relX; lastPoint.y += relY;
 			} else if (thisOp.opcode == "JMPL") {
@@ -992,7 +994,7 @@ function parseProgram() {
 
 		switch (command) {
 			case "VCTR": newOp = new vecOp("VCTR", splitLine[1], splitLine[2], splitLine[3], splitLine[4]); break;
-			case "LABS": newOp = new vecOp("LABS", (2048 / 2) + parseInt(splitLine[1]), (2048 / 2) + parseInt(splitLine[2]), splitLine[3]); break;
+			case "LABS": newOp = new vecOp("LABS", (2048 / 2) + parseInt(splitLine[1]) * 2, (2048 / 2) + parseInt(splitLine[2]) * 2, splitLine[3]); break;
 			case "HALT": newOp = new vecOp("HALT"); break;
 			case "JSRL":
 				if (codeLabels.hasOwnProperty(splitLine[1])) newOp = new vecOp("JSRL", codeLabels[splitLine[1]]);
